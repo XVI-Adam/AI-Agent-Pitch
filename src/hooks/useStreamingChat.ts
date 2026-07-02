@@ -1,16 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Message } from '../types/chat';
-import { SYSTEM_PROMPT } from '../data/context';
 
-// Groq — free tier, OpenAI-compatible, reliable model availability.
-// See https://console.groq.com/docs/models for the current model list.
-const MODEL = 'llama-3.1-8b-instant';
-
-// In dev, route through the Vite proxy (/api/groq → api.groq.com) to avoid CORS.
-// In production a backend proxy or serverless function is needed for the same reason.
-const API_URL = import.meta.env.DEV
-  ? '/api/groq/openai/v1/chat/completions'
-  : 'https://api.groq.com/openai/v1/chat/completions';
+// Proxied through api/chat.ts (a Vercel Edge Function in prod, executed locally
+// via the vite.config.ts dev shim) — the model and system prompt are owned
+// server-side so the Groq key never reaches the client bundle.
+const API_URL = '/api/chat';
 
 const STREAM_TIMEOUT_MS = 45_000;
 const MAX_INPUT_LENGTH = 8_000;
@@ -90,34 +84,19 @@ export function useStreamingChat({ messages, addMessage, updateById }: UseStream
     let accumulatedContent = '';
 
     try {
-      const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-
-      if (!apiKey) {
-        throw new Error('VITE_GROQ_API_KEY is not set. Copy .env.example to .env and add your key.');
-      }
-
-      // Build message history — system prompt first, then conversation history,
-      // excluding the empty assistant placeholder we just appended.
-      const apiMessages = [
-        { role: 'system' as const, content: SYSTEM_PROMPT },
-        ...[...messages, userMsg].map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      ];
+      // Conversation history, excluding the empty assistant placeholder we just
+      // appended — api/chat.ts prepends the system prompt server-side.
+      const apiMessages = [...messages, userMsg].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'authorization': `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: apiMessages,
-          max_tokens: 4096,
-          stream: true,
-        }),
+        body: JSON.stringify({ messages: apiMessages }),
         signal: controller.signal,
       });
 
