@@ -17,7 +17,6 @@ export function ChatMessage({ message, index }: ChatMessageProps) {
   const { role, content, timestamp, streaming } = message;
   const isUser = role === 'user';
 
-  // Show skeleton while the assistant placeholder has no tokens yet.
   const showSkeleton = !isUser && streaming && content.length === 0;
 
   const safeContent = useMemo(() => sanitize(content), [content]);

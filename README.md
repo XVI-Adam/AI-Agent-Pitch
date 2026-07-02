@@ -14,7 +14,9 @@ The brief asked for a streaming AI chat with persistent history, markdown render
 
 **Streaming via `getReader()`.** The SSE reader loop pulls chunks from the response body, parses `content_block_delta` events, and appends tokens using functional `setState` so React batches never drop a character mid-stream.
 
-**CORS solved with a Vite proxy.** Direct browser calls to the AI API are blocked by CORS. Rather than a backend, the Vite dev server proxies `/api/groq/*` → `api.groq.com` server-side — same fix, zero infrastructure.
+**Groq key stays server-side.** `api/chat.ts` and `api/fit.ts` are Vercel Edge Functions — plain `fetch` wrappers, no SDK — that hold `GROQ_API_KEY` and forward requests to Groq. The client never sees the key. In dev, a small Vite plugin (`vite.config.ts`) intercepts `POST /api/chat` and `/api/fit`, loads the *actual* `api/*.ts` handler via `server.ssrLoadModule()`, and runs it locally — so dev and prod execute identical code with no `vercel dev` dependency.
+
+**JD Fit Rater.** A second tab (`FitPanel`/`FitReportView`/`useFitRater`) lets a recruiter paste a job description and get a calibrated 1–10 fit score with a per-category breakdown, honest gaps, and a tailored pitch — a single non-streaming JSON call to `api/fit.ts`, validated server-side against the `FitReport` shape before it ever reaches the client.
 
 ---
 
@@ -25,7 +27,8 @@ The brief asked for a streaming AI chat with persistent history, markdown render
 | Persistent chat history | `useChatHistory` — localStorage, survives refresh |
 | Clear / reset | Armed two-step "Clear chat" button + `⌘K` shortcut |
 | Markdown rendering | `react-markdown` + `remark-gfm` — code blocks, bold, lists, tables |
-| Unit tests | 20 tests across `sanitize`, `useChatHistory`, `ChatMessage` |
+| JD Fit Rater | `useFitRater` + `api/fit.ts` — scored, validated fit report |
+| Unit tests | `sanitize`, `useChatHistory`, `ChatMessage`, `validateFitReport`, `useFitRater`, `scoreColor` |
 
 ---
 
@@ -35,7 +38,8 @@ The brief asked for a streaming AI chat with persistent history, markdown render
 |---|---|
 | Framework | React 19 + TypeScript (strict mode) |
 | Build | Vite |
-| AI | Groq API (`llama-3.1-8b-instant`) via SSE streaming |
+| Backend | Vercel Edge Functions (`api/chat.ts`, `api/fit.ts`) |
+| AI | Groq API (`llama-3.1-8b-instant`) — SSE streaming for chat, JSON mode for the fit rater |
 | Markdown | `react-markdown` + `remark-gfm` |
 | Tests | Vitest + `@testing-library/react` |
 
@@ -46,7 +50,7 @@ The brief asked for a streaming AI chat with persistent history, markdown render
 ```bash
 git clone <repo>
 cd ffind-technical
-cp .env.example .env        # add your VITE_GROQ_API_KEY (free at console.groq.com)
+cp .env.example .env        # add your GROQ_API_KEY (free at console.groq.com)
 npm install
 npm run dev                 # http://localhost:5173
 ```
@@ -55,6 +59,15 @@ npm run dev                 # http://localhost:5173
 
 ```bash
 npm test
+```
+
+## Deployment
+
+Deploys to Vercel with zero config — it auto-detects the Vite build output plus the `api/*.ts` Edge Functions. Set `GROQ_API_KEY` as an environment variable in the Vercel project settings (never `VITE_`-prefixed, so it stays server-side), then:
+
+```bash
+npx vercel        # first deploy, links the project
+npx vercel --prod # promote to production
 ```
 
 ---
@@ -66,3 +79,4 @@ npm test
 - **Token usage display** — surface input/output token counts in the UI
 - **Conversation branching** — retry from any message, not just the last
 - **Embed the context** — move from system-prompt injection to real vector retrieval for larger knowledge bases
+- **Recruiter contact capture** — a lightweight lead-capture form after a fit report renders

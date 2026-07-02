@@ -21,7 +21,7 @@ export function ChatInput({ status, onSend, onCancel, onClear, draftSeed }: Chat
 
   const streaming = status === 'awaiting' || status === 'streaming';
 
-  // Seed the textarea when an empty-state prompt pill is clicked.
+
   useEffect(() => {
     if (draftSeed) {
       setValue(draftSeed);

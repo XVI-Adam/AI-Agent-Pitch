@@ -4,6 +4,9 @@ import { useStreamingChat } from './hooks/useStreamingChat';
 import { ChatHistory } from './components/ChatHistory';
 import { ChatInput } from './components/ChatInput';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { FitPanel } from './components/FitPanel';
+
+type View = 'chat' | 'fit';
 
 const IS_MAC =
   typeof navigator !== 'undefined' &&
@@ -32,9 +35,11 @@ function useArmedAction(onConfirm: () => void, armedMs = 2400) {
 interface MastheadProps {
   onClear: () => void;
   canClear: boolean;
+  view: View;
+  onViewChange: (view: View) => void;
 }
 
-function Masthead({ onClear, canClear }: MastheadProps) {
+function Masthead({ onClear, canClear, view, onViewChange }: MastheadProps) {
   const armedClear = useArmedAction(onClear);
 
   const today = useMemo(
@@ -76,6 +81,24 @@ function Masthead({ onClear, canClear }: MastheadProps) {
           </button>
         </div>
       </div>
+      <nav className="tabs" aria-label="View">
+        <button
+          type="button"
+          className="tab"
+          data-active={view === 'chat' ? 'true' : 'false'}
+          onClick={() => onViewChange('chat')}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          className="tab"
+          data-active={view === 'fit' ? 'true' : 'false'}
+          onClick={() => onViewChange('fit')}
+        >
+          Fit Rater
+        </button>
+      </nav>
     </header>
   );
 }
@@ -94,6 +117,7 @@ export default function App() {
   } = useStreamingChat({ messages, addMessage, updateById });
 
   const [draftSeed, setDraftSeed] = useState<{ value: string; n: number } | null>(null);
+  const [view, setView] = useState<View>('chat');
 
   const handleClear = useCallback(() => {
     cancel();
@@ -106,23 +130,29 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="app">
-        <Masthead onClear={handleClear} canClear={canClear} />
-        <ChatHistory
-          messages={messages}
-          isLoading={isLoading}
-          currentStreamedMessage={currentStreamedMessage}
-          error={error}
-          onRetry={retry}
-          onDismissError={dismissError}
-          onPickPrompt={(p) => setDraftSeed({ value: p, n: Date.now() })}
-        />
-        <ChatInput
-          status={status}
-          onSend={sendMessage}
-          onCancel={cancel}
-          onClear={handleClear}
-          draftSeed={draftSeed?.value}
-        />
+        <Masthead onClear={handleClear} canClear={canClear} view={view} onViewChange={setView} />
+        {view === 'chat' ? (
+          <>
+            <ChatHistory
+              messages={messages}
+              isLoading={isLoading}
+              currentStreamedMessage={currentStreamedMessage}
+              error={error}
+              onRetry={retry}
+              onDismissError={dismissError}
+              onPickPrompt={(p) => setDraftSeed({ value: p, n: Date.now() })}
+            />
+            <ChatInput
+              status={status}
+              onSend={sendMessage}
+              onCancel={cancel}
+              onClear={handleClear}
+              draftSeed={draftSeed?.value}
+            />
+          </>
+        ) : (
+          <FitPanel />
+        )}
       </div>
     </ErrorBoundary>
   );
