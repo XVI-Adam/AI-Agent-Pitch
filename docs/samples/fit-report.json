@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "note": "Illustrative FitReport from POST /api/fit. Scores vary run to run — regenerate with `npm run bench -- --save`.",
+    "jobDescription": "Forward-deployed / solutions engineer at an AI-native startup. React + TypeScript, comfortable talking directly to customers, ships fast, works across the stack, and translates messy user needs into working software."
+  },
+  "overall_score": 8,
+  "categories": {
+    "tech_stack": {
+      "score": 8,
+      "rationale": "React + TypeScript is his daily stack, and this very app is React 19 in strict mode."
+    },
+    "experience_level": {
+      "score": 6,
+      "rationale": "A 2025 grad with real shipped products, but fewer years than a mid-level hire would bring."
+    },
+    "seniority": {
+      "score": 6,
+      "rationale": "Operated as sole developer on a platform migration, though without formal senior tenure."
+    },
+    "domain_fit": {
+      "score": 9,
+      "rationale": "The role's build-plus-talk-to-customers shape matches his trainer-turned-developer background almost exactly."
+    },
+    "working_style": {
+      "score": 9,
+      "rationale": "Ships fast, thrives in ambiguity, and defaults to AI tooling — the described startup mode is his native one."
+    }
+  },
+  "gaps": [
+    "Early-career: less production tenure than a senior forward-deployed hire.",
+    "No named enterprise-scale deployment experience in the described domain."
+  ],
+  "tailored_pitch": "Adam already lives the exact loop this role asks for — he built and shipped BodyCraft solo on a React/TypeScript-adjacent stack while at Sigo Signs he translated non-technical users' needs into a migrated TypeScript platform. Point him at your customers and he'll ship the software and run the conversation, which is precisely the forward-deployed profile you're hiring for."
+}

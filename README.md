@@ -61,6 +61,26 @@ npm run dev                 # http://localhost:5173
 npm test
 ```
 
+## Benchmarking
+
+With a dev server running (it holds `GROQ_API_KEY`), measure real endpoint
+latency and streaming throughput:
+
+```bash
+npm run dev                    # terminal 1
+npm run bench                  # terminal 2 — TTFT, tokens/sec, fit round-trip
+npm run bench -- --save        # also refresh docs/samples/
+```
+
+## Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system map, request
+  lifecycles, module responsibilities, design decisions, and the security model.
+- **[docs/API.md](docs/API.md)** — reference for `POST /api/chat` (SSE) and
+  `POST /api/fit` (JSON): request/response shapes, status codes, curl examples.
+- **[docs/samples/](docs/samples/)** — representative chat transcript and a
+  validated fit report, regenerable via `npm run bench -- --save`.
+
 ## Deployment
 
 Deploys to Vercel with zero config — it auto-detects the Vite build output plus the `api/*.ts` Edge Functions. Set `GROQ_API_KEY` as an environment variable in the Vercel project settings (never `VITE_`-prefixed, so it stays server-side), then:
