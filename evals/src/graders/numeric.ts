@@ -1,6 +1,6 @@
-import type { FactsLedger } from '../facts';
-import { excerpt } from '../normalize';
-import type { Finding, GraderResult, NumericToleranceSpec } from '../types';
+import type { FactsLedger } from '../facts.ts';
+import { excerpt } from '../normalize.ts';
+import type { Finding, GraderResult, NumericToleranceSpec } from '../types.ts';
 
 // The grader that exists because the spec'd grounded-entity check would be
 // WRONG without it.

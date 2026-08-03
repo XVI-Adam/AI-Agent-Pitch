@@ -1,4 +1,4 @@
-import { FIT_CONTEXT_SUMMARY } from '../../src/data/context';
+import { FIT_CONTEXT_SUMMARY } from '../../src/data/context.ts';
 
 // Extracted from api/fit.ts so the eval harness can build the exact prompt the
 // endpoint sends without spinning up a server. Pure: JD in, prompt string out.

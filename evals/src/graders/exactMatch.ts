@@ -1,6 +1,6 @@
-import type { FactsLedger } from '../facts';
-import { normalizeTight } from '../normalize';
-import type { ExactMatchSpec, Finding, GraderResult } from '../types';
+import type { FactsLedger } from '../facts.ts';
+import { normalizeTight } from '../normalize.ts';
+import type { ExactMatchSpec, Finding, GraderResult } from '../types.ts';
 
 // Contact details get an exact-match grader rather than the fuzzy phrase check.
 //

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { normalize } from './normalize';
-import type { FactEntry, FactStatus } from './types';
+import { normalize } from './normalize.ts';
+import type { FactEntry, FactStatus } from './types.ts';
 
 // Parses FACTS.md. The prose is commentary; the ```yaml fences ARE the data.
 // Everything outside a fence is ignored, which is what lets the file read as a

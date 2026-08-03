@@ -1,9 +1,9 @@
-import { validateFitReport } from '../../../api/_lib/validateFitReport';
-import type { FitReport } from '../../../src/types/fit';
-import type { FactsLedger } from '../facts';
-import type { Finding, GraderResult, GraderSpec } from '../types';
-import { gradeGrounded } from './grounded';
-import { gradeForbidden } from './forbidden';
+import { validateFitReport } from '../../../api/_lib/validateFitReport.ts';
+import type { FitReport } from '../../../src/types/fit.ts';
+import type { FactsLedger } from '../facts.ts';
+import type { Finding, GraderResult, GraderSpec } from '../types.ts';
+import { gradeGrounded } from './grounded.ts';
+import { gradeForbidden } from './forbidden.ts';
 
 // JD Fit Rater graders.
 //

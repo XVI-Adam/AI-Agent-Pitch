@@ -3,21 +3,22 @@
 // The repo's vitest default is jsdom (for the React tests). These read files
 // and use import.meta.url, so they need the node environment.
 import { describe, expect, it } from 'vitest';
-import { buildLedger, isLiteralClaim, loadLedger, matchablePhrases, parseFactsMarkdown } from '../src/facts';
-import { containsPhrase, normalize } from '../src/normalize';
-import { gradeAbstention } from '../src/graders/abstention';
-import { gradeExactMatch } from '../src/graders/exactMatch';
-import { detectEntities, gradeGrounded } from '../src/graders/grounded';
-import { gradeNumericTolerance, resolveDerived } from '../src/graders/numeric';
+import { buildLedger, isLiteralClaim, loadLedger, matchablePhrases, parseFactsMarkdown } from '../src/facts.ts';
+import { containsPhrase, normalize } from '../src/normalize.ts';
+import { gradeAbstention } from '../src/graders/abstention.ts';
+import { gradeExactMatch } from '../src/graders/exactMatch.ts';
+import { detectEntities, gradeGrounded } from '../src/graders/grounded.ts';
+import { gradeNumericTolerance, resolveDerived } from '../src/graders/numeric.ts';
 import {
   gradeDateRange,
   gradeForbidden,
   gradeMustContradict,
   gradeMustInclude,
-} from '../src/graders/forbidden';
-import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema';
-import { loadCases, filterCases } from '../src/cases';
-import type { FitReport } from '../../src/types/fit';
+} from '../src/graders/forbidden.ts';
+import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema.ts';
+import { loadCases, filterCases } from '../src/cases.ts';
+import { firstAssertion, isNegatedMention } from '../src/negation.ts';
+import type { FitReport } from '../../src/types/fit.ts';
 
 const ledger = loadLedger();
 
@@ -427,5 +428,55 @@ describe('ledger integrity', () => {
       const resolved = resolveDerived(entry.id, buildLedger(ledger.entries));
       expect('months' in resolved, `${entry.id}: ${JSON.stringify(resolved)}`).toBe(true);
     }
+  });
+});
+
+// Added after the first end-to-end run failed lq-001 on a CORRECT answer: the
+// model said "He wasn't a founding engineer" and the forbidden grader flagged
+// it. Correcting a false premise requires naming it.
+describe('negation awareness', () => {
+  it('distinguishes a denial from an assertion', () => {
+    expect(isNegatedMention("He wasn't a founding engineer.", 12)).toBe(true);
+    expect(isNegatedMention('He was a founding engineer.', 9)).toBe(false);
+  });
+
+  it('does not let a negation in a previous sentence launder a later claim', () => {
+    const text = "That's not accurate. He was a founding engineer.";
+    expect(isNegatedMention(text, text.indexOf('founding'))).toBe(false);
+  });
+
+  it('does not let a negation before "but" launder the clause after it', () => {
+    const text = "He isn't senior, but he was a founding engineer.";
+    expect(isNegatedMention(text, text.indexOf('founding'))).toBe(false);
+  });
+
+  it('finds the asserted occurrence when a phrase is both denied and asserted', () => {
+    const text = 'He has no AWS experience, though he did use AWS Lambda at scale.';
+    const asserted = firstAssertion(text, /AWS/i);
+    expect(asserted?.index).toBe(text.lastIndexOf('AWS'));
+  });
+
+  it('passes a correct rejection of a leading question end to end', () => {
+    const response =
+      "That's not accurate. Adam was hired as a software trainer at Sigo Signs and became the sole developer. He wasn't a founding engineer.";
+    const forbidden = gradeForbidden(response, { forbidden: 'default' }, ledger);
+    expect(forbidden.passed, JSON.stringify(forbidden.findings)).toBe(true);
+    const grounded = gradeGrounded(response, ledger, { mode: 'strict' });
+    expect(grounded.passed, JSON.stringify(grounded.findings)).toBe(true);
+  });
+
+  it('still fails an actual assertion of the banned claim', () => {
+    const result = gradeForbidden('Yes, he was a founding engineer there.', { forbidden: 'default' }, ledger);
+    expect(result.passed).toBe(false);
+    expect(result.findings[0].factId).toBe('never.founding-engineer');
+  });
+
+  it('passes an abstention that names the technology it is ruling out', () => {
+    const result = gradeGrounded(
+      "I don't have anything on Kubernetes in his background — he has no Kubernetes experience listed.",
+      ledger,
+      { mode: 'strict' },
+    );
+    expect(result.passed, JSON.stringify(result.findings)).toBe(true);
   });
 });

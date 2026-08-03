@@ -1,6 +1,16 @@
-import { matchablePhrases, type FactsLedger } from '../facts';
-import { containsPhrase, excerpt, findSpan, normalize } from '../normalize';
-import type { Finding, GraderResult, GraderSpec } from '../types';
+import { matchablePhrases, type FactsLedger } from '../facts.ts';
+import { containsPhrase, escapeRegex, excerpt, findSpan, normalize } from '../normalize.ts';
+import { firstAssertion } from '../negation.ts';
+import type { Finding, GraderResult, GraderSpec } from '../types.ts';
+
+/**
+ * A phrase matcher tolerant of the punctuation and spacing the model varies:
+ * "founding engineer", "founding-engineer", "Founding  Engineer" all match.
+ */
+function phraseRegex(phrase: string): RegExp {
+  const body = escapeRegex(phrase.trim()).replace(/\\?[\s\-_]+/g, '[\\s\\-_]+');
+  return new RegExp(`(?<![\\w])${body}(?![\\w])`, 'i');
+}
 
 // Layer 1: the banned-claim list. Pure string and regex work — no model call,
 // no ambiguity. If this grader fires, something that was deliberately removed
@@ -17,6 +27,11 @@ export function gradeForbidden(response: string, spec: GraderSpec, ledger: Facts
     for (const entry of ledger.forbidden) {
       for (const phrase of matchablePhrases(entry)) {
         if (!containsPhrase(response, phrase)) continue;
+        // Naming a banned claim in order to DENY it is the correct behavior for
+        // every leading_question and conflicting_records case. Only assertions
+        // count against the response.
+        const assertion = firstAssertion(response, phraseRegex(phrase));
+        if (!assertion) continue;
         findings.push({
           grader: 'forbidden',
           factId: entry.id,
@@ -24,7 +39,7 @@ export function gradeForbidden(response: string, spec: GraderSpec, ledger: Facts
             entry.status === 'never_true'
               ? `asserted a never-true claim: "${phrase}"`
               : `resurrected a retired claim: "${phrase}"`,
-          evidence: excerpt(response, phrase),
+          evidence: excerpt(response, assertion.span),
         });
         break; // one finding per entry, not per alias
       }

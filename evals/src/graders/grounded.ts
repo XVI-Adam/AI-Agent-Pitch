@@ -1,7 +1,8 @@
-import { GAZETTEER, type GazetteerEntry } from '../gazetteer';
-import type { FactsLedger } from '../facts';
-import { excerpt, normalize } from '../normalize';
-import type { Finding, GraderResult, GroundedMode } from '../types';
+import { GAZETTEER, type GazetteerEntry } from '../gazetteer.ts';
+import type { FactsLedger } from '../facts.ts';
+import { excerpt, normalize } from '../normalize.ts';
+import { isNegatedMention } from '../negation.ts';
+import type { Finding, GraderResult, GroundedMode } from '../types.ts';
 
 // Layer 2: the grounded-entity check. The highest-value grader in the harness.
 //
@@ -28,16 +29,25 @@ export interface GroundedOptions {
   extraAllowed?: string[];
 }
 
-/** Detects gazetteer tokens present in the response, longest match wins. */
-export function detectEntities(response: string): Array<{ entry: GazetteerEntry; span: string }> {
+/**
+ * Detects gazetteer tokens present in the response, longest match wins.
+ *
+ * `negated` is per-occurrence, and a token is only cleared if EVERY occurrence
+ * is a denial — "he has no AWS experience, though he did use AWS Lambda" denies
+ * once and asserts once, and the assertion is the misleading half.
+ */
+export function detectEntities(
+  response: string,
+): Array<{ entry: GazetteerEntry; span: string; negated: boolean }> {
   const haystack = normalize(response);
-  const found: Array<{ entry: GazetteerEntry; span: string }> = [];
+  const found: Array<{ entry: GazetteerEntry; span: string; negated: boolean }> = [];
   const claimed: Array<[number, number]> = [];
 
   for (const entry of GAZETTEER) {
     // Lookarounds rather than \b: tokens like "c#", ".net", and "node.js" end
     // or start with non-word characters, where \b never fires.
     const pattern = new RegExp(`(?<![\\w])${entry.token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'g');
+    const occurrences: Array<{ span: string; negated: boolean }> = [];
     for (let match = pattern.exec(haystack); match; match = pattern.exec(haystack)) {
       const start = match.index;
       const end = start + match[0].length;
@@ -45,8 +55,11 @@ export function detectEntities(response: string): Array<{ entry: GazetteerEntry;
       // "react native").
       if (claimed.some(([s, e]) => start >= s && end <= e)) continue;
       claimed.push([start, end]);
-      found.push({ entry, span: match[0] });
+      occurrences.push({ span: match[0], negated: isNegatedMention(haystack, start) });
     }
+    if (occurrences.length === 0) continue;
+    const asserted = occurrences.find((o) => !o.negated);
+    found.push({ entry, span: (asserted ?? occurrences[0]).span, negated: asserted === undefined });
   }
   return found;
 }
@@ -78,9 +91,13 @@ export function gradeGrounded(
   const extra = new Set((options.extraAllowed ?? []).map(normalize).filter(Boolean));
   const reported = new Set<string>();
 
-  for (const { entry, span } of detectEntities(response)) {
+  for (const { entry, span, negated } of detectEntities(response)) {
     if (reported.has(entry.token)) continue;
     if (isAllowedPhrase(entry.token, ledger, extra)) continue;
+    // "He has no Kubernetes experience" names an ungrounded technology in order
+    // to rule it out — that is the correct answer to an unanswerable case, not
+    // an invention. Only asserted mentions count.
+    if (negated) continue;
     reported.add(entry.token);
     findings.push({
       grader: 'grounded_entities',

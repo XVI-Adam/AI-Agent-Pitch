@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .env
 .env.local
+
+# eval harness
+evals/.cache
+evals/results

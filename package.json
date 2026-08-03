@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "node scripts/benchmark.mjs"
+    "bench": "node scripts/benchmark.mjs",
+    "eval": "node evals/src/run.ts",
+    "eval:baseline": "node evals/src/baseline.ts"
   },
   "dependencies": {
     "react": "^19.2.5",

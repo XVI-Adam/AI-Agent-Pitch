@@ -1,5 +1,5 @@
-import { excerpt, findSpan } from '../normalize';
-import type { AbstentionSpec, Finding, GraderResult } from '../types';
+import { excerpt, findSpan } from '../normalize.ts';
+import type { AbstentionSpec, Finding, GraderResult } from '../types.ts';
 
 // Layer 3: the abstention check, for questions FACTS.md genuinely cannot answer.
 //

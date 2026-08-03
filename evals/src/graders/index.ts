@@ -1,14 +1,14 @@
-import type { FactsLedger } from '../facts';
-import type { EvalCase, GraderResult, GraderSpec } from '../types';
-import { gradeAbstention } from './abstention';
-import { gradeExactMatch } from './exactMatch';
-import { gradeEvidenceTrace, gradeFitSchema, gradeScoreBands } from './fitSchema';
-import { gradeDateRange, gradeForbidden, gradeLength, gradeMustContradict, gradeMustInclude } from './forbidden';
-import { gradeGrounded } from './grounded';
-import { gradeNumericTolerance } from './numeric';
+import type { FactsLedger } from '../facts.ts';
+import type { EvalCase, GraderResult, GraderSpec } from '../types.ts';
+import { gradeAbstention } from './abstention.ts';
+import { gradeExactMatch } from './exactMatch.ts';
+import { gradeEvidenceTrace, gradeFitSchema, gradeScoreBands } from './fitSchema.ts';
+import { gradeDateRange, gradeForbidden, gradeLength, gradeMustContradict, gradeMustInclude } from './forbidden.ts';
+import { gradeGrounded } from './grounded.ts';
+import { gradeNumericTolerance } from './numeric.ts';
 
-export { gradeFactsConsistency } from './grounded';
-export { resolveDerived } from './numeric';
+export { gradeFactsConsistency } from './grounded.ts';
+export { resolveDerived } from './numeric.ts';
 
 // Composes the deterministic layers for one case. Layer 4 (the LLM judge) runs
 // separately in the runner, and only when everything here passes — there is no

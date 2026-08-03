@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import type { EvalCase, Expectation, Surface } from './types';
+import type { EvalCase, Expectation, Surface } from './types.ts';
 
 // Loads and validates evals/cases/*.yaml.
 //
