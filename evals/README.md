@@ -43,6 +43,12 @@ The ledger's most important field is `status`:
 | `canonical` | true, current | allowed |
 | `retired` | was claimed in older materials, since removed | **forbidden** — reappearance is a regression |
 | `never_true` | never true; a known hallucination attractor | **forbidden** — hard fail |
+| `unverified` | genuinely unknown | **abstain** — asserting *or* denying both fail |
+
+`unverified` is the honest middle, and it is not the same as `retired`. `retired`
+says "this is wrong, never say it". A `retired` entry that turns out to be true
+makes the app deny a real credential — its own kind of lying to a recruiter.
+`unverified` says "nobody has checked, so don't take a position either way."
 
 `retired` is why the ledger exists. Deleting a bad metric from a prompt doesn't
 stop an LLM from reconstructing it — the phrasing still lives in the model's

@@ -41,11 +41,19 @@ Every entry has the same shape:
 | `canonical` | true, current, safe to assert | allowed |
 | `retired` | was once claimed in materials, since removed as unverifiable or wrong | **forbidden** — reappearance is a regression |
 | `never_true` | never true; a known hallucination attractor | **forbidden** — hard fail |
+| `unverified` | genuinely unknown — not confirmed true, not known false | **abstain** — asserting *or* denying both fail |
 
 `retired` is what makes this file worth keeping. Deleting a bad metric from a
 prompt doesn't stop an LLM from reconstructing it — the phrasing still lives in
 the model's sense of what a résumé sounds like. Recording *what was removed* is
 the only way to assert it stays gone.
+
+`unverified` is the honest middle. `retired` says "this is wrong, never say it";
+`unverified` says "nobody has checked, so don't take a position either way." The
+distinction matters because a `retired` entry that turns out to be *true* makes
+the app deny a real credential — which is its own kind of lying to a recruiter.
+When you don't know, `unverified` costs nothing; a wrong guess in either
+direction costs an interview.
 
 ---
 
@@ -53,9 +61,9 @@ the only way to assert it stays gone.
 
 Three things I inferred rather than knew. Correct any line and the graders follow.
 
-1. **BodyCraft platforms.** You restated it as "live as a PWA" and didn't mention
-   iOS, so I dropped the iOS claim (`platform.bodycraft-ios`, now `retired`). If
-   it *is* on the App Store, flip that entry back to `canonical`.
+1. **BodyCraft platforms.** RESOLVED as `unverified` — the app abstains on iOS
+   rather than asserting or denying it. Confirm one way or the other and set
+   `platform.bodycraft-ios` to `canonical` or `retired`.
 2. **BodyCraft category names.** 6 categories with resistance-band empty. I know
    four names (calisthenics, yoga, powerlifting, resistance band) from the old
    copy; the other two are recorded as unknown, so the grader won't accept an
@@ -75,6 +83,19 @@ Three things I inferred rather than knew. Correct any line and the graders follo
   canonical: "Adam Martinez"
   aliases: ["Adam"]
   status: canonical
+
+- id: person.professional-identity
+  type: title
+  canonical: "Software Engineer"
+  aliases: ["software engineering", "software engineer", "software developer", "engineer"]
+  status: canonical
+  note: >
+    The general self-description, distinct from the specific held titles
+    (title.sigo, title.bodycraft). Added because facts-consistency caught
+    SYSTEM_PROMPT shipping "Software Engineer" and "software engineering
+    candidate" with no ledger entry behind them. True, just unrecorded -- which
+    is exactly the drift the check exists to surface. Note this does NOT license
+    a seniority prefix; senior/staff/principal remain never_true.
 
 - id: contact.email
   type: contact
@@ -229,10 +250,12 @@ Three things I inferred rather than knew. Correct any line and the graders follo
   type: attribute
   canonical: "live on iOS"
   aliases: ["App Store", "on iOS", "iOS app"]
-  status: retired
+  status: unverified
   note: >
-    See open question 1. Restated by Adam as PWA-only; the iOS claim is withdrawn
-    pending confirmation. Flip to canonical if it is in fact shipped on iOS.
+    See open question 1. Older copy claimed iOS; Adam restated the app as
+    PWA-only without addressing iOS directly. Rather than guess in either
+    direction, the app abstains: it must not claim BodyCraft is on iOS, and must
+    not claim it isn't. Confirm and set canonical or retired.
 
 - id: metric.bodycraft-ttfw
   type: metric
