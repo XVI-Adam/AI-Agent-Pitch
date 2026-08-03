@@ -1,0 +1,15 @@
+{
+  "_readme": [
+    "Cases that are known to fail and should NOT block CI.",
+    "",
+    "Each entry needs a reason and a TODO. An entry without a plan to remove it is",
+    "how a suite quietly stops testing anything -- the failure becomes furniture.",
+    "",
+    "A case listed here still runs and still appears in the report under 'Known",
+    "failures'; it just does not fail the build. Remove the entry when the",
+    "underlying issue is fixed, and CI will start guarding it again.",
+    "",
+    "Populate after triaging the first run. Empty means every failure blocks."
+  ],
+  "cases": {}
+}

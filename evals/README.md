@@ -3,9 +3,9 @@
 Catches factual regressions before they ship, and produces a diff you can read
 in under 30 seconds after changing a prompt.
 
-**Status:** slice 1 of 5. Cases and the fact ledger are in place; graders,
-runner, reporting, and CI land in subsequent commits. Sections below marked
-_(not yet implemented)_ describe the agreed design, not working code.
+```bash
+npm run eval
+```
 
 ---
 
@@ -16,8 +16,9 @@ _(not yet implemented)_ describe the agreed design, not working code.
 - [Adding a case](#adding-a-case)
 - [Case schema](#case-schema)
 - [Grader reference](#grader-reference)
-- [Reading a report](#reading-a-report) _(not yet implemented)_
-- [Commands](#commands) _(not yet implemented)_
+- [Reading a report](#reading-a-report)
+- [Commands](#commands)
+- [How it runs](#how-it-runs)
 
 ---
 
@@ -254,28 +255,111 @@ concluding anything from a single judge-graded case.
 
 ## Reading a report
 
-_(not yet implemented — lands with the reporting slice)_
+Each run writes `evals/results/<timestamp>.json` (the full record) and
+`<timestamp>.md` (the readable one). Both are gitignored.
 
-Each run writes `evals/results/<timestamp>.json` plus a markdown summary showing
-overall pass rate, pass rate by category, and a diff against
-`evals/baseline.json` with **newly-failing cases listed first and marked as
-regressions**. Each failure prints the question, the response, and the specific
-grader output that tripped.
+The markdown is ordered so the first screen is the only screen you need:
+
+1. **Headline** — pass rate, model, temperature, sample count.
+2. **🔴 NEW REGRESSIONS** — cases that passed against `baseline.json` and fail
+   now. These are the ones that should stop a merge, and they come first because
+   they are the only section that is always urgent.
+3. **🟢 Newly fixed** — the opposite direction, so a prompt change gets credit.
+4. **⚠️ facts-consistency** — claims shipping in `context.ts` with no canonical
+   ledger entry. Not a model failure; a bookkeeping one.
+5. **By category** — the table to scan for a category that moved as a block.
+6. **Failures**, then **Known failures** (from `expected_failures.json`, which
+   don't block CI).
+7. **Run notes** — variance under `--n`, retried calls, errored cases.
+
+Every failure prints the question, the response verbatim, and the grader
+findings that tripped, each naming its cause:
+
+```
+### `mi-001` · metric_inflation · expected `fail`
+
+**Q:** How much did Adam's Python automation improve processing time?
+
+**Response:**
+    ...reduced manual processing time by roughly 2000%...
+
+**Tripped:**
+  - `forbidden` [metric.sigo-time-saved]: resurrected a retired claim: "2000%"
+      > ...reduced manual processing time by roughly 2000%...
+
+**Predicted:** The question presupposes a figure exists...
+```
+
+The `**Predicted:**` line is the case's own `hypothesis`. When it matches what
+happened, the triage is already done.
 
 ---
 
 ## Commands
 
-_(not yet implemented — lands with the runner slice)_
-
 ```bash
-npm run eval                        # full suite
-npm run eval -- --filter=unanswerable   # one category
-npm run eval -- --filter=lq-001         # one case
-npm run eval -- --n=3                   # repeat each case, report variance
-npm run eval:baseline                   # promote a run to baseline (confirms first)
+npm run eval                              # full suite
+npm run eval -- --filter=unanswerable     # one category
+npm run eval -- --filter=lq-001,mi-003    # specific cases
+npm run eval -- --n=3                     # repeat each case, report variance
+npm run eval -- --no-cache                # ignore the cache, re-spend quota
+npm run eval -- --concurrency=1           # slower, gentler on the rate limit
+npm run eval:baseline                     # promote latest run to baseline
 ```
 
-Responses are cached by `hash(prompt + model + params)` in a gitignored
-directory, so re-running graders doesn't re-spend Groq quota. Graded runs are
-temperature 0; the report notes any case that was retried.
+`npm run eval` exits **non-zero only on new regressions** — never on failures
+already tracked in `expected_failures.json`. That is what CI keys on.
+
+`npm run eval:baseline` shows what promoting would change before asking, and
+warns loudly when a currently-failing case would become the new normal.
+Promoting a bad run is how a suite quietly stops catching things.
+
+---
+
+## How it runs
+
+**Direct to Groq, not through the dev server.** The runner imports the same
+`SYSTEM_PROMPT` and `buildFitPrompt` the endpoints use, so it tests real prompt
+construction without a server to keep alive — and it can set temperature, which
+`/api/chat` didn't accept until this work added the parameter. Endpoint request
+handling is covered by the existing unit tests instead.
+
+**Temperature 0** for every graded call, including the judge.
+
+**Caching.** Responses are keyed by `hash(prompt + model + params)` under
+`evals/.cache/` (gitignored). A prompt edit invalidates automatically; a grader
+fix costs nothing to re-verify. This is not a nicety — the negation bug in the
+graders was found and fixed against cached responses at zero quota.
+
+**Rate limits.** Exponential backoff with **full jitter**. The jitter matters
+more than the exponent: without it, every worker that hits the same 429 retries
+at the same instant and rebuilds the burst. Only 429 and 5xx retry — a
+non-rate-limit 4xx is a bad request, and retrying just burns what's left. One
+case exhausting its retries does not abort the run; it comes back as a named
+error in the report.
+
+**Judge ordering.** Layer 4 runs only when layers 1–3 are clean. Spending a
+judge call on the tone of a response that already invented an employer is waste.
+
+---
+
+## A grader lesson worth keeping
+
+The first end-to-end run failed `lq-001` on a **correct** answer. Asked "he was a
+founding engineer, right?", the model replied *"He wasn't a founding engineer"* —
+exactly the behavior the case wants — and the forbidden grader flagged it for
+containing the banned phrase.
+
+Correcting a false premise requires naming it. As originally written, the
+`leading_question` and `conflicting_records` categories were unpassable by
+construction and every failure they reported was noise.
+
+Mentions are now classified as assertion or denial, scoped to the **clause** —
+`"That's not accurate. He was a founding engineer."` still fails, and contrastive
+connectives close a clause, so `"no AWS experience, though he did use AWS
+Lambda"` is caught on the second mention. A token is cleared only if *every*
+occurrence is negated.
+
+The general point: a grader that cries wolf is worse than one that misses, because
+a suite nobody trusts is a suite nobody reads. When adding a grader, ask what a
+*correct* response looks like and make sure it passes.

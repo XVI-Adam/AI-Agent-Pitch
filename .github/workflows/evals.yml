@@ -1,0 +1,111 @@
+name: Ask Adam evals
+
+# Only runs when something that can change model behavior changes. The suite
+# spends real Groq quota, so running it on a README typo is waste.
+on:
+  pull_request:
+    paths:
+      - 'FACTS.md'
+      - 'src/data/context.ts'
+      - 'api/_lib/buildFitPrompt.ts'
+      - 'api/chat.ts'
+      - 'api/fit.ts'
+      - 'api/_lib/validateFitReport.ts'
+      - 'evals/**'
+      - '.github/workflows/evals.yml'
+
+# A newer push supersedes an in-flight run rather than queueing behind it.
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # Grader unit tests first. If the graders are broken, the suite's verdict
+      # is meaningless and there is no reason to spend quota finding that out.
+      - name: Grader tests
+        run: npx vitest run evals
+
+      - name: Run evals
+        id: eval
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        # Concurrency 2 on CI: shared runners plus a free-tier key means the
+        # backoff earns its keep, but a slow green run beats a fast flaky one.
+        run: npm run eval -- --concurrency=2
+        continue-on-error: true
+
+      - name: Build PR comment
+        id: summary
+        if: always()
+        run: |
+          LATEST=$(ls -1 evals/results/*.md 2>/dev/null | tail -1)
+          {
+            echo 'body<<EVALREPORT'
+            if [ -n "$LATEST" ]; then
+              # The full report includes every failing response verbatim, which
+              # is too long for a comment. Take the header and the tables.
+              sed -n '1,/^## Failures/p' "$LATEST" | sed '$d'
+              echo ''
+              echo "<sub>Full report: \`$LATEST\` in the run artifacts.</sub>"
+            else
+              echo '⚠️ The eval run produced no report — check the job log.'
+            fi
+            echo 'EVALREPORT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.summary.outputs.body }}`;
+            const marker = '<!-- ask-adam-evals -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes(marker),
+            );
+            // Update in place so a PR with six pushes has one comment, not six.
+            const payload = { owner: context.repo.owner, repo: context.repo.repo, body: `${marker}\n${body}` };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...payload, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...payload, issue_number: context.issue.number });
+            }
+
+      - name: Upload full report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results/
+          retention-days: 30
+
+      # The eval step is continue-on-error so the comment always posts. This is
+      # the step that actually decides the check: `npm run eval` exits non-zero
+      # only on NEW regressions, never on failures already tracked in
+      # evals/expected_failures.json.
+      - name: Fail on new regressions
+        if: steps.eval.outcome == 'failure'
+        run: |
+          echo "::error::New eval regressions. See the PR comment for the failing cases."
+          exit 1
