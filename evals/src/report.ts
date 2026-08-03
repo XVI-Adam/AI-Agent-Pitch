@@ -26,6 +26,7 @@ export interface CaseOutcome {
 export interface RunReport {
   timestamp: string;
   model: string;
+  judgeModel?: string;
   temperature: number;
   samples: number;
   filter?: string;
@@ -95,7 +96,9 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
   out.push('');
   out.push(
     `**${passing.length}/${cases.length} passing (${pct(passing.length, cases.length)})** · ` +
-      `model \`${report.model}\` · temperature ${report.temperature}` +
+      `model \`${report.model}\`` +
+      (report.judgeModel ? ` · judge \`${report.judgeModel}\`` : '') +
+      ` · temperature ${report.temperature}` +
       (report.samples > 1 ? ` · ${report.samples} samples/case` : '') +
       (report.filter ? ` · filter \`${report.filter}\`` : ''),
   );

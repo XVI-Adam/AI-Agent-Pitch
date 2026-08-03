@@ -35,9 +35,13 @@ const ACKNOWLEDGMENT_MARKERS = [
 const REDIRECT_MARKERS = [
   /\b(what (i|he) (do|does) have|what i can tell you|here'?s what)\b/i,
   /\b(you'?d want to|best to|worth) ask(ing)?\b/i,
-  /\b(reach out|contact|ask adam|ask him)\b/i,
+  /\b(reach(?:ing)? out|contact(?:ing)?|ask(?:ing)? (?:adam|him)|recommend)\b/i,
   /\b(he (has|did|does)|his (actual|documented|recorded))\b/i,
-  /\b(happy to|i can) (share|cover|tell|walk)\b/i,
+  /\b(happy to|i can) (share|cover|tell|walk|suggest)\b/i,
+  /\b(i(?:'d| would)? suggest|i recommend|you (?:could|might|may want to))\b/i,
+  /\b(in an? (?:interview|conversation|call)|directly with him)\b/i,
+  /\bhis (?:education|experience|resume|background|portfolio|details?)\b/i,
+  /\bwhat (?:is|i) (?:do )?(?:have|know|can confirm)\b/i,
 ];
 
 /**

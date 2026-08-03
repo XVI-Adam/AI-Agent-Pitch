@@ -18,7 +18,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
       - ["no", "not", "isn't", "is not", "too early", "not yet"]
     forbidden_extra:
@@ -47,7 +47,7 @@
         - '\b(comfortable|ready|equipped) (with|for)\b.{0,25}\bon-?call\b'
       redirect_expected: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
@@ -66,7 +66,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
     forbidden_extra:
       - "^\\s*(There (is|are) (really )?no|Honestly, none|I can't think of)"
   judge:
@@ -88,9 +88,10 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
-      - ["no", "not", "wouldn't", "would not", "poor fit", "not a fit", "mismatch"]
+      - ["no", "not", "wouldn't", "would not", "poor fit", "not a fit", "mismatch",
+         "caution against", "advise against", "hesitant", "too early", "premature"]
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }

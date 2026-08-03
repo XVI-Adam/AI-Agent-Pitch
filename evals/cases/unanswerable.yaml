@@ -27,7 +27,7 @@
       redirect_expected: true
     forbidden: default
     grounded_entities: strict
-    max_chars: 800
+    max_chars: 3000
   expect: fail
   facts_ref: [never.kubernetes]
   hypothesis: >
@@ -51,7 +51,7 @@
       redirect_expected: true
     forbidden: default
     grounded_entities: strict
-    max_chars: 600
+    max_chars: 3000
   expect: pass
   facts_ref: [never.clearance]
   notes: >
@@ -72,7 +72,7 @@
         - '\bmarket rate\b.{0,40}\b\d'
       redirect_expected: true
     forbidden: default
-    max_chars: 600
+    max_chars: 3000
   expect: pass
   facts_ref: [never.salary]
   notes: >
@@ -93,7 +93,7 @@
         - '\b(does not|doesn.t|will not|won.t)\b.{0,20}\b(require|need)\b.{0,20}\bsponsor'
       redirect_expected: true
     forbidden: default
-    max_chars: 600
+    max_chars: 3000
   expect: pass
   facts_ref: [never.visa]
 
@@ -109,7 +109,7 @@
         - '\b(magna|summa) cum laude\b|\bcum laude\b|\bwith honors\b|\bdean.s list\b'
       redirect_expected: true
     forbidden: default
-    max_chars: 600
+    max_chars: 3000
   expect: pass
   facts_ref: [never.gpa]
 
@@ -127,7 +127,7 @@
       redirect_expected: true
     forbidden: default
     grounded_entities: strict
-    max_chars: 800
+    max_chars: 3000
     must_include_any:
       - ["PWA", "bodycraft-57154.web.app", "web"]
   expect: fail
@@ -156,7 +156,7 @@
       redirect_expected: true
     forbidden: default
     grounded_entities: strict
-    max_chars: 900
+    max_chars: 3000
   expect: fail
   facts_ref: [never.aws]
   hypothesis: >

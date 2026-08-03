@@ -5,7 +5,7 @@ import { SYSTEM_PROMPT } from '../../src/data/context.ts';
 import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
 import { filterCases, loadCases, loadJobDescription } from './cases.ts';
 import { loadLedger } from './facts.ts';
-import { complete, DEFAULT_MODEL, mapWithConcurrency } from './groq.ts';
+import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, mapWithConcurrency } from './groq.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
 import { runJudge } from './graders/judge.ts';
 import { renderMarkdown, type CaseOutcome, type RunReport } from './report.ts';
@@ -24,28 +24,31 @@ interface Args {
   concurrency: number;
   noCache: boolean;
   model: string;
+  judgeModel: string;
   json: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { n: 1, concurrency: 3, noCache: false, model: DEFAULT_MODEL, json: false };
+  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false };
   for (const arg of argv) {
     const [flag, value] = arg.includes('=') ? arg.split(/=(.*)/s) : [arg, undefined];
     switch (flag) {
       case '--filter': args.filter = value; break;
       case '--n': args.n = Math.max(1, Number(value) || 1); break;
-      case '--concurrency': args.concurrency = Math.max(1, Number(value) || 3); break;
+      case '--concurrency': args.concurrency = Math.max(1, Number(value) || 1); break;
       case '--no-cache': args.noCache = true; break;
       case '--model': if (value) args.model = value; break;
+      case '--judge-model': if (value) args.judgeModel = value; break;
       case '--json': args.json = true; break;
       case '--help':
         console.log(`Usage: npm run eval -- [options]
 
   --filter=<category|id>   run one slice (comma-separated, e.g. unanswerable,lq-001)
   --n=<count>              repeat each case N times and report variance
-  --concurrency=<count>    parallel requests (default 3; Groq free tier is tight)
+  --concurrency=<count>    parallel requests (default 1; Groq free tier is 6000 TPM)
   --no-cache               ignore the response cache and re-spend quota
-  --model=<id>             override the model (default ${DEFAULT_MODEL})
+  --model=<id>             override the model under test (default ${DEFAULT_MODEL})
+  --judge-model=<id>       override the judge (default ${DEFAULT_JUDGE_MODEL})
   --json                   print the JSON report to stdout instead of markdown`);
         process.exit(0);
     }
@@ -136,7 +139,10 @@ async function runOnce(
   // response that already invented an employer is wasted quota.
   let judge = undefined;
   if (evalCase.judge && deterministic.passed) {
-    judge = await runJudge(evalCase, questionOf(evalCase), responseText, ledger, { ...options, model: args.model });
+    judge = await runJudge(evalCase, questionOf(evalCase), responseText, ledger, {
+      ...options,
+      model: args.judgeModel,
+    });
   }
 
   const passed = deterministic.passed && (judge?.passed ?? true);
@@ -208,6 +214,7 @@ async function main(): Promise<void> {
   const report: RunReport = {
     timestamp: new Date().toISOString(),
     model: args.model,
+    judgeModel: args.judgeModel,
     temperature: 0,
     samples: args.n,
     filter: args.filter,

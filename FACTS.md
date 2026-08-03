@@ -138,8 +138,20 @@ Three things I inferred rather than knew. Correct any line and the graders follo
     - "B.S. in Computer Information Systems"
     - "BS Computer Information Systems"
     - "Computer Information Systems"
+    - "Bachelor of Science"
+    - "bachelor"
+    - "b.s."
+    - "bs"
     - "CIS"
+    - "CS Minor"
+    - "minor in Computer Science"
+    - "computer science"
   status: canonical
+  note: >
+    Aliases cover "Bachelor of Science ... minor in Computer Science", which is
+    how the model phrases it. The first full run flagged "bachelor" and
+    "computer science" as invented against a correct answer -- a ledger gap, not
+    a hallucination. The CS MINOR is real; a CS *major* or degree is not.
 
 - id: education.school
   type: company

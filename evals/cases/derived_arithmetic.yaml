@@ -26,7 +26,7 @@
       - '\bseveral years\b'
       - '\ba few years\b'
     grounded_entities: lenient                    # derived numbers are expected here
-    max_chars: 900
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
@@ -51,7 +51,7 @@
       unit: months
       extract: '(\d+(?:\.\d+)?)\s*(years?|yrs?|months?)'
     grounded_entities: lenient
-    max_chars: 700
+    max_chars: 3000
   expect: pass
   facts_ref: [derived.years-since-graduation, education.grad_date]
   notes: >

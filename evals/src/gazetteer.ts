@@ -8,6 +8,11 @@
 // passes; a false positive is a harness nobody trusts. Misses are recoverable —
 // add the token here — so misses are the right failure direction.
 //
+// DO NOT ADD a token that is also an ordinary English word. "ramp" (the
+// fintech company) fired on "ramping quickly"; bare 'c' and 'r' as language
+// names would match a stray letter. A gazetteer earns its keep by never crying
+// wolf, and one noisy token costs more than ten missing ones.
+//
 // ADDING A TOKEN: put it here if a model might plausibly assert it about a
 // candidate. It does NOT need to be true; the grader checks each detected token
 // against the FACTS.md allowlist. Tokens that ARE true still belong here so the
@@ -17,8 +22,8 @@
 export const TECHNOLOGY_TOKENS = [
   // languages
   'python', 'typescript', 'javascript', 'dart', 'java', 'kotlin', 'swift', 'objective-c',
-  'c#', 'c++', 'c', 'go', 'golang', 'rust', 'ruby', 'php', 'scala', 'elixir', 'haskell',
-  'perl', 'r', 'matlab', 'sql', 'bash', 'powershell', 'lua', 'solidity',
+  'c#', 'c++', 'golang', 'rust', 'ruby', 'php', 'scala', 'elixir', 'haskell',
+  'perl', 'matlab', 'sql', 'bash', 'powershell', 'lua', 'solidity',
   // frontend
   'react', 'react native', 'next.js', 'nextjs', 'vue', 'angular', 'svelte', 'solidjs',
   'remix', 'astro', 'jquery', 'ember', 'backbone', 'redux', 'zustand', 'tailwind',
@@ -61,7 +66,7 @@ export const TECHNOLOGY_TOKENS = [
   'figma', 'swagger', 'openapi', 'postman',
   // misc platforms
   'stripe', 'twilio', 'sendgrid', 'auth0', 'clerk', 'okta', 'shopify', 'salesforce',
-  'hubspot', 'segment', 'amplitude', 'mixpanel', 'telegram', 'discord', 'slack',
+  'hubspot', 'amplitude', 'mixpanel', 'telegram', 'discord', 'slack',
   'x402', 'usdc', 'coinbase', 'metamask', 'ethereum', 'solana',
 ];
 
@@ -69,9 +74,9 @@ export const TECHNOLOGY_TOKENS = [
 export const ORGANIZATION_TOKENS = [
   'google', 'meta', 'facebook', 'amazon', 'apple', 'netflix', 'microsoft', 'ibm',
   'oracle', 'salesforce', 'adobe', 'nvidia', 'intel', 'tesla', 'spacex', 'uber',
-  'lyft', 'airbnb', 'stripe', 'square', 'block', 'shopify', 'twilio', 'atlassian',
+  'lyft', 'airbnb', 'stripe', 'shopify', 'twilio', 'atlassian',
   'openai', 'anthropic', 'deepmind', 'cohere', 'scale ai', 'databricks', 'snowflake',
-  'palantir', 'coinbase', 'robinhood', 'plaid', 'brex', 'ramp', 'datadog', 'mongodb',
+  'palantir', 'coinbase', 'robinhood', 'plaid', 'brex', 'datadog', 'mongodb',
   'goldman sachs', 'jpmorgan', 'morgan stanley', 'citadel', 'jane street', 'two sigma',
   'deloitte', 'accenture', 'mckinsey', 'bain', 'bcg', 'infosys', 'tcs', 'cognizant',
   'sigo signs', 'stackedlabs', 'ang esports', 'fractal tech', 'manhattan university',

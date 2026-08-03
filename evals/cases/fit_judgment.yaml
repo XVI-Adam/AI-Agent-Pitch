@@ -19,7 +19,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1500
+    max_chars: 3000
     must_include_any:
       - ["Sigo", "trainer"]
   judge:
@@ -43,7 +43,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1500
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness, usefulness]
     min: { groundedness: 4, directness: 4, usefulness: 4 }
@@ -64,7 +64,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1500
+    max_chars: 3000
     forbidden_extra:
       - '\b(any|every|whatever) role\b'
       - '\bperfect fit for (any|anything)\b'

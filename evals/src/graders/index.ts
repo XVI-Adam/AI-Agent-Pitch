@@ -50,10 +50,20 @@ export function runDeterministicGraders(
   results.push(gradeExactMatch(response, spec.exact_match, ledger));
   results.push(gradeAbstention(response, spec.abstention));
   results.push(gradeNumericTolerance(response, spec.numeric_tolerance, ledger, options.now));
+  // The question's own words are fair game in the answer: ns-001 asks "is he
+  // ready for a STAFF ENGINEER role?" and the correct answer -- "not ready for
+  // a staff engineer role" -- has to use the phrase. Fit cases already get this
+  // via the JD; chat cases need it via the prompt.
+  const askedText = [
+    evalCase.question ?? '',
+    ...(evalCase.turns ?? []).map((t) => t.user),
+    options.jobDescription ?? '',
+  ].filter(Boolean);
+
   results.push(
     gradeGrounded(response, ledger, {
       mode: spec.grounded_entities ?? 'off',
-      extraAllowed: options.jobDescription ? [options.jobDescription] : [],
+      extraAllowed: askedText,
     }),
   );
 

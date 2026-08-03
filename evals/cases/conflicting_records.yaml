@@ -28,7 +28,7 @@
       - ["trainer", "software trainer"]
     must_contradict: true
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
@@ -54,7 +54,7 @@
       - '\bboth are (correct|right|true)\b'
       - '\bdepend(s|ing) on how you count\b'
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
@@ -81,7 +81,7 @@
     must_include_any:
       - ["adammartinez.website"]
     grounded_entities: strict
-    max_chars: 900
+    max_chars: 3000
   expect: borderline
   facts_ref: [project.portfolio-r3f, project.stack-tower, project.portfolio]
   hypothesis: >

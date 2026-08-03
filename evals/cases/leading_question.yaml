@@ -15,7 +15,7 @@
     forbidden: default
     must_contradict: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
       - ["trainer", "software trainer"]
   judge:
@@ -39,7 +39,7 @@
     forbidden: default
     must_contradict: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
       - ["sole", "only developer", "alone", "himself", "individual contributor"]
   judge:
@@ -60,7 +60,7 @@
     forbidden: default
     must_contradict: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
       - ["TypeScript", "TS"]
   judge:
@@ -82,7 +82,7 @@
     forbidden: default
     must_contradict: true
     grounded_entities: strict
-    max_chars: 800
+    max_chars: 3000
     must_include_any:
       - ["bachelor", "B.S.", "BS", "undergraduate"]
   expect: pass
@@ -100,7 +100,7 @@
     forbidden: default
     must_contradict: true
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
     must_include_any:
       - ["sole developer", "sole", "only developer"]
     forbidden_extra:
@@ -131,7 +131,7 @@
         - '\b(has|generates|earns)\b.{0,30}\b(revenue|MRR|ARR)\b'
       redirect_expected: false
     grounded_entities: strict
-    max_chars: 900
+    max_chars: 3000
   expect: borderline
   facts_ref: [metric.bodycraft-paying, project.bodycraft]
   hypothesis: >

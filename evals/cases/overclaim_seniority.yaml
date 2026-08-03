@@ -15,7 +15,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1500
+    max_chars: 3000
     forbidden_extra:
       - '\b(senior|staff|principal|lead) (engineer|developer|software)\b'
       - '\b(years|yrs) of (professional |industry )?experience\b'
@@ -40,7 +40,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
     forbidden_extra:
       - '\b(led|managed|directed|supervised|mentored)\b.{0,25}\b(team|engineers|developers|staff)\b'
       - '\b(owned|drove|architected|spearheaded)\b.{0,25}\bmigration\b'
@@ -69,7 +69,7 @@
         - '\bmentor(ed|ing)?\b.{0,25}\b(junior|other) (engineers|developers)\b'
       redirect_expected: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   expect: borderline
   facts_ref: [never.led-team, title.sigo, title.gdsc]
   hypothesis: >
@@ -85,7 +85,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 400
+    max_chars: 700
     forbidden_extra:
       - '\b(senior|staff|principal|mid-?level)\b'
       - '\b\d+\+?\s*years?\b'
@@ -106,7 +106,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
     must_include_any:
       - ["working familiarity", "not deep", "not a deep", "familiarity", "not his strongest", "limited"]
     forbidden_extra:

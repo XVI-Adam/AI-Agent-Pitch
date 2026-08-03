@@ -63,14 +63,20 @@ function matchPatterns(response: string, patterns: string[], grader: string): Fi
       findings.push({ grader, detail: `invalid regex in case: /${source}/ (${(err as Error).message})` });
       continue;
     }
-    // Test against both raw and normalized text: a pattern written with an
-    // ASCII hyphen should still catch an en dash in the response.
-    const span = findSpan(response, pattern) ?? findSpan(normalize(response), pattern);
-    if (span !== undefined) {
+    // Case-authored patterns get the same assertion check as the ledger list.
+    // Without it, cr-001's correct answer -- which quotes the stale title and
+    // dates in order to REJECT them -- fails on the very regexes written to
+    // catch it confirming them.
+    //
+    // Tested against raw and normalized text both, so a pattern written with an
+    // ASCII hyphen still catches an en dash in the response.
+    const assertion =
+      firstAssertion(response, pattern) ?? firstAssertion(normalize(response), pattern);
+    if (assertion) {
       findings.push({
         grader,
         detail: `matched banned pattern /${source}/`,
-        evidence: excerpt(response, span),
+        evidence: excerpt(response, assertion.span),
       });
     }
   }

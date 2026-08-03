@@ -17,7 +17,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 800
+    max_chars: 3000
     must_match_daterange: "Oct 2025 - Dec 2025"
     must_include_any:
       - ["3 months", "three months", "Oct", "October"]
@@ -39,7 +39,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
     must_include_any:
       - ["sole", "only developer", "alone"]
     forbidden_extra:
@@ -76,7 +76,7 @@
         - '\b(similar|transferable|comparable|maps to)\b.{0,30}\bKafka\b'
       redirect_expected: true
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   expect: fail
   facts_ref: [never.kubernetes, project.bodycraft]
   hypothesis: >

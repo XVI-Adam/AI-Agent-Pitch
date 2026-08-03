@@ -27,4 +27,5 @@ dist-ssr
 
 # eval harness
 evals/.cache
-evals/results
+evals/results/*.json
+evals/results/*.md

@@ -1,5 +1,5 @@
 import type { FactsLedger } from '../facts.ts';
-import { complete, DEFAULT_MODEL, type CompleteOptions } from '../groq.ts';
+import { complete, DEFAULT_JUDGE_MODEL, type CompleteOptions } from '../groq.ts';
 import type { EvalCase, Finding, JudgeScore, JudgeSpec, JudgeVerdict } from '../types.ts';
 
 // Layer 4: the LLM judge. Runs LAST and only for what layers 1-3 cannot decide
@@ -52,7 +52,11 @@ FACTS EXCERPT:
 ${factsExcerpt}
 
 QUESTION ASKED:
-${question}
+${question}${
+    question.includes('[turn 1]')
+      ? '\n\nNOTE: this is a multi-turn conversation. Grade the response against the LAST turn only; the earlier turns are context. A short answer to a short follow-up is correct, not evasive.'
+      : ''
+  }
 
 RESPONSE TO GRADE:
 ${response}
@@ -85,14 +89,30 @@ export function buildFactsExcerpt(evalCase: EvalCase, ledger: FactsLedger): stri
       .join('\n');
   }
 
-  return entries
-    .map((e) => {
-      const status = e.status === 'canonical' ? '' : ` (STATUS: ${e.status.toUpperCase()})`;
-      const detail = e.description ? ` — ${e.description.trim()}` : '';
-      const note = e.note ? `\n    note: ${e.note.trim()}` : '';
-      return `- [${e.id}]${status} ${e.canonical}${detail}${note}`;
-    })
-    .join('\n');
+  const render = (e: (typeof entries)[number]) => {
+    const status = e.status === 'canonical' ? '' : ` (STATUS: ${e.status.toUpperCase()})`;
+    const detail = e.description ? ` — ${e.description.trim()}` : '';
+    return `- [${e.id}]${status} ${e.canonical}${detail}`;
+  };
+
+  // The referenced entries first, with their notes, then the REST of the ledger
+  // as background.
+  //
+  // The first full run scored correct answers ungrounded because the excerpt
+  // held only the case's facts_ref: fl-001 named Adam's role and dates exactly
+  // right, mentioned the C#/.NET migration in passing, and the judge had no way
+  // to see that the migration is in the ledger too. A judge that cannot see a
+  // true fact has to call it invented.
+  const referenced = new Set(entries.map((e) => e.id));
+  const background = ledger.allowed.filter((e) => !referenced.has(e.id)).map(render);
+
+  return [
+    'DIRECTLY RELEVANT:',
+    ...entries.map((e) => `${render(e)}${e.note ? `\n    note: ${e.note.trim()}` : ''}`),
+    '',
+    'ALSO TRUE (background — do not penalize the response for using these):',
+    ...background,
+  ].join('\n');
 }
 
 function parseVerdict(raw: string, spec: JudgeSpec): { scores: Record<string, JudgeScore> } | { error: string } {
@@ -149,7 +169,7 @@ export async function runJudge(
 
   const completion = await complete(
     {
-      model: options.model ?? DEFAULT_MODEL,
+      model: options.model ?? DEFAULT_JUDGE_MODEL,
       temperature: 0,
       max_tokens: 700,
       messages: [{ role: 'user', content: prompt }],

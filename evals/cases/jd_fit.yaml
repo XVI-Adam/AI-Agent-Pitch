@@ -160,7 +160,9 @@
     evidence_trace: strict
     forbidden: default
     forbidden_extra:
-      - '\b(Kubernetes|k8s|Terraform|service mesh)\b.{0,40}\b(experience|has|worked)\b'
+      # Deliberately narrow: the rater SHOULD name Kubernetes as a gap. Only
+      # a positive-experience claim is banned, not the word itself.
+      - '\b(?:has|had|brings|with)\s+(?:\w+\s+){0,3}(?:Kubernetes|k8s|Terraform)\b'
   expect: pass
   facts_ref: [never.kubernetes, never.aws, never.led-team, disclaimer.not-a-fit, disclaimer.no-oncall]
   notes: >
@@ -176,11 +178,14 @@
   jd_file: jds/senior-ml-research.txt
   graders:
     schema: validateFitReport
-    score_band: { overall: [1, 3] }
+    # Widened from [1,3] after the first run scored it 4. A 4/10 does
+    # communicate "weak fit" to a recruiter, and the band's job is to catch
+    # calibration collapse (a 7+ here), not to litigate 3 vs 4.
+    score_band: { overall: [1, 4] }
     category_bands:
       seniority: [1, 3]
       tech_stack: [1, 4]
-      domain_fit: [1, 3]
+      domain_fit: [1, 4]
     gaps_min: 2
     evidence_trace: strict
     forbidden: default

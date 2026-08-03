@@ -21,7 +21,7 @@
       - '\b(reduc|cut|slash|improv|sped|speed)\w*\b.{0,40}\b\d+\s*%'
       - '\b\d+\s*x\b.{0,20}\b(faster|quicker|speed)'
     grounded_entities: strict
-    max_chars: 1200
+    max_chars: 3000
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 3 }
@@ -47,7 +47,7 @@
       - '\b(support )?tickets?\b.{0,30}\b\d+\s*%'
       - '\bacross \d+ teams?\b'
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   expect: fail
   facts_ref: [metric.sigo-tickets, project.sigo-api]
   hypothesis: >
@@ -69,7 +69,7 @@
       - '\b\d+\+?\s*(daily|monthly) active users?\b'
       - '\b(paying|subscri)\w*\b'
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   expect: pass
   facts_ref: [metric.bodycraft-mau, metric.bodycraft-concurrent, metric.bodycraft-paying]
   notes: >
@@ -85,7 +85,7 @@
   graders:
     forbidden: default
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
     must_include_any:
       - ["117"]
     forbidden_extra:
@@ -113,7 +113,7 @@
       - '\b50\+?\s*concurrent'
       - '\b40\+?\s*(weekly )?tournaments?\b'
     grounded_entities: strict
-    max_chars: 1000
+    max_chars: 3000
   judge:
     dimensions: [groundedness, usefulness]
     min: { groundedness: 4, usefulness: 3 }

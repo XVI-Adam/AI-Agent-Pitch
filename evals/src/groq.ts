@@ -15,6 +15,13 @@ import { fileURLToPath } from 'node:url';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const DEFAULT_MODEL = 'llama-3.1-8b-instant';
 
+// The judge is deliberately a BIGGER model than the one under test. The first
+// full run used 8b for both and it scored mt-001 -- "Adam worked at Sigo Signs
+// from October 2025 to December 2025, approximately 3 months", which is exactly
+// right -- a groundedness of 1. A judge no stronger than the system it grades
+// adds variance, not signal. Override with --judge-model.
+export const DEFAULT_JUDGE_MODEL = 'llama-3.3-70b-versatile';
+
 const CACHE_DIR = fileURLToPath(new URL('../.cache', import.meta.url));
 
 export interface CompletionParams {
@@ -71,8 +78,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
   if (retryAfterSeconds !== undefined) return retryAfterSeconds * 1000 + Math.random() * 500;
-  const ceiling = Math.min(1000 * 2 ** attempt, 60_000);
-  return Math.random() * ceiling;
+  // Floor as well as ceiling: with pure full jitter, early attempts can draw
+  // a near-zero delay and burn a retry against a TPM window that resets on a
+  // 60s boundary. The floor makes each attempt actually worth spending.
+  const ceiling = Math.min(1000 * 2 ** attempt, 45_000);
+  return 750 + Math.random() * ceiling;
 }
 
 export interface CompleteOptions {
@@ -92,7 +102,7 @@ export async function complete(params: CompletionParams, options: CompleteOption
     if (hit) return hit;
   }
 
-  const maxRetries = options.maxRetries ?? 6;
+  const maxRetries = options.maxRetries ?? 10;
   let lastReason = 'unknown';
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

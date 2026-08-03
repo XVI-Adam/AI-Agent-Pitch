@@ -1,7 +1,7 @@
 import { GAZETTEER, type GazetteerEntry } from '../gazetteer.ts';
 import type { FactsLedger } from '../facts.ts';
 import { excerpt, normalize } from '../normalize.ts';
-import { isNegatedMention } from '../negation.ts';
+import { isNonAssertion } from '../negation.ts';
 import type { Finding, GraderResult, GroundedMode } from '../types.ts';
 
 // Layer 2: the grounded-entity check. The highest-value grader in the harness.
@@ -55,7 +55,7 @@ export function detectEntities(
       // "react native").
       if (claimed.some(([s, e]) => start >= s && end <= e)) continue;
       claimed.push([start, end]);
-      occurrences.push({ span: match[0], negated: isNegatedMention(haystack, start) });
+      occurrences.push({ span: match[0], negated: isNonAssertion(haystack, start, match[0].length) });
     }
     if (occurrences.length === 0) continue;
     const asserted = occurrences.find((o) => !o.negated);
