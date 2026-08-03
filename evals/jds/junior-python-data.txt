@@ -1,0 +1,18 @@
+Junior Data Engineer
+Logistics company (200 employees) · Chicago · Hybrid
+
+Entry-level role on our data platform team, supporting warehouse and fulfillment
+analytics.
+
+What you'll do
+- Write and maintain Python ETL jobs moving data between operational systems
+- Build file-processing automation for large batch imports (100k+ records)
+- Maintain CSV audit and reconciliation pipelines for the operations team
+- Write SQL for analyst-facing reporting tables
+- Work with the warehouse ops team to understand what the data actually means
+
+Requirements
+- 0-2 years experience; recent grads welcome
+- Solid Python, including generators, error handling, and retry logic
+- SQL fundamentals
+- Bonus: experience with file-system automation at scale or Windows permissions

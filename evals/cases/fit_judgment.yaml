@@ -1,0 +1,88 @@
+# fit_judgment — 3 cases
+#
+# The only chat category where the LLM judge is the primary grader, which makes
+# it the noisiest pass rate in the report and the least actionable. Three cases
+# is enough to smell drift without letting judge variance dominate the summary.
+#
+# What is being graded: reasoning tied to SPECIFIC named projects, not generic
+# praise. "He'd ramp fast because he's a quick learner" is a fail even though
+# nothing in it is false. The judge must quote the supporting FACTS.md span for
+# any groundedness score above the floor.
+#
+# Run these with --n=3 when interpreting the report; a single sample of a judge
+# score is not a measurement.
+
+- id: fj-001
+  category: fit_judgment
+  surface: chat
+  question: "Would he ramp fast on a forward-deployed role?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 1500
+    must_include_any:
+      - ["Sigo", "trainer"]
+  judge:
+    dimensions: [groundedness, directness, tone_for_recruiter, usefulness]
+    min: { groundedness: 4, directness: 3, tone_for_recruiter: 3, usefulness: 4 }
+    require_evidence: true
+    rubric_note: >
+      Score usefulness >=4 only if the answer names at least one concrete project
+      or role and explains the MECHANISM of the fit — e.g. the trainer-to-developer
+      arc means he has gathered requirements face-to-face from non-technical users
+      and then shipped the software that solved their problem. Generic praise
+      ("fast learner", "great communicator", "hits the ground running") caps
+      usefulness at 2 regardless of length or enthusiasm.
+  expect: pass
+  facts_ref: [attribute.targeting, title.sigo, attribute.sigo-role, attribute.working-style]
+
+- id: fj-002
+  category: fit_judgment
+  surface: chat
+  question: "We're a 6-person seed-stage startup with no PM and no process. Honest read — thrive or drown?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 1500
+  judge:
+    dimensions: [groundedness, directness, usefulness]
+    min: { groundedness: 4, directness: 4, usefulness: 4 }
+    require_evidence: true
+    rubric_note: >
+      The ledger says he thrives in ambiguity at early-stage startups without
+      established process, so "thrive" is the grounded answer — but it must be
+      argued from evidence (solo zero-to-live delivery on BodyCraft, shipping
+      features at Sigo without a spec), not asserted. Refusing to give a verdict
+      caps directness at 2; this question asks for a call.
+  expect: pass
+  facts_ref: [attribute.working-style, attribute.targeting, project.bodycraft]
+
+- id: fj-003
+  category: fit_judgment
+  surface: chat
+  question: "Our first hire will spend half their time on customer calls and half writing code. Is that a fit or a compromise for him?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 1500
+    forbidden_extra:
+      - '\b(any|every|whatever) role\b'
+      - '\bperfect fit for (any|anything)\b'
+  judge:
+    dimensions: [groundedness, directness, tone_for_recruiter, usefulness]
+    min: { groundedness: 4, directness: 4, tone_for_recruiter: 3, usefulness: 4 }
+    require_evidence: true
+    rubric_note: >
+      This is the closest match in the ledger to Adam's stated target, so a
+      strong yes is correct. The failure mode is enthusiasm without a mechanism —
+      score usefulness >=4 only if the answer connects the split explicitly to
+      the trainer-to-developer arc or to a named project, and acknowledges at
+      least one real limitation (~7 months of professional tenure). An answer
+      that would read identically for any candidate fails.
+  expect: borderline
+  facts_ref: [attribute.targeting, title.sigo, disclaimer.experience-length]
+  hypothesis: >
+    The question hands the model its single best talking point, which is exactly
+    when it stops arguing and starts selling. Watching for the FIT_CONTEXT_SUMMARY
+    "standout signal" paragraph being recited nearly verbatim without being tied
+    to anything the recruiter said.

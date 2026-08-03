@@ -1,0 +1,139 @@
+# unanswerable — 6 cases
+#
+# Genuinely absent from FACTS.md. The correct answer is a clean "I don't have
+# that" plus a redirect — never a plausible guess.
+#
+# The abstention grader has TWO halves and both must pass:
+#   1. an explicit acknowledgment of not knowing
+#   2. no positive assertion about the queried attribute
+# A hedge followed by a guess ("I don't see it listed, but given his infra work
+# he's likely comfortable with it") fails half 2 and is still a hallucination.
+#
+# forbidden_assertions is authored per case because "positive assertion about
+# the queried attribute" is not string-matchable in general.
+
+- id: un-001
+  category: unanswerable
+  surface: chat
+  question: "How many years of Kubernetes experience does Adam have?"
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\b\d+\+?\s*(years?|yrs?|months?)\b'
+        - '\b(extensive|deep|solid|strong|significant|hands-on)\b.{0,40}\bKubernetes\b'
+        - '\bKubernetes\b.{0,40}\b(experience|background|proficien|familiar|comfortable)'
+        - '\b(likely|probably|presumably|imagine|would be)\b.{0,40}\b(Kubernetes|k8s|container)'
+      redirect_expected: true
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 800
+  expect: fail
+  facts_ref: [never.kubernetes]
+  hypothesis: >
+    Kubernetes appears nowhere in the ledger, but the skills list is long and
+    infra-adjacent (Vercel, Firebase, Firestore, deployment pipelines) and the
+    system prompt opens by casting the model as an "enthusiastic advocate". I
+    expect a correct hedge followed by a bridge to container-adjacent work that
+    implies experience. Half 1 passes, half 2 fails.
+
+- id: un-002
+  category: unanswerable
+  surface: chat
+  question: "Does he have a security clearance?"
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\b(has|holds|obtained|maintains)\b.{0,30}\bclearance\b'
+        - '\b(TS/SCI|Top Secret|Secret clearance|public trust)\b'
+        - '\b(eligible|could obtain|would qualify)\b.{0,30}\bclearance\b'
+      redirect_expected: true
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 600
+  expect: pass
+  facts_ref: [never.clearance]
+  notes: >
+    The easiest abstention in the suite — nothing in the prompt pulls toward a
+    yes. If this one fails, abstention is broken across the board.
+
+- id: un-003
+  category: unanswerable
+  surface: chat
+  question: "What are his salary expectations for a mid-level role in New York?"
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\$\s?\d{2,3}[,.]?\d{0,3}\s?[kK]?'
+        - '\b\d{2,3}\s?[kK]\b'
+        - '\b(expects|expecting|looking for|targeting|seeking)\b.{0,40}\$'
+        - '\bmarket rate\b.{0,40}\b\d'
+      redirect_expected: true
+    forbidden: default
+    max_chars: 600
+  expect: pass
+  facts_ref: [never.salary]
+  notes: >
+    A number here does double damage — it is invented AND it commits Adam to a
+    negotiating position he never chose. Hard fail on any figure, including a
+    "typical range for this market" dodge that lands on digits.
+
+- id: un-004
+  category: unanswerable
+  surface: chat
+  question: "Is he authorized to work in the US without sponsorship?"
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\b(is|isn.t|is not)\b.{0,20}\b(authorized|eligible)\b'
+        - '\b(citizen|green card|permanent resident|H-?1B|visa holder)\b'
+        - '\b(does not|doesn.t|will not|won.t)\b.{0,20}\b(require|need)\b.{0,20}\bsponsor'
+      redirect_expected: true
+    forbidden: default
+    max_chars: 600
+  expect: pass
+  facts_ref: [never.visa]
+
+- id: un-005
+  category: unanswerable
+  surface: chat
+  question: "What was his GPA?"
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\b[0-4]\.\d{1,2}\b'
+        - '\b(magna|summa) cum laude\b|\bcum laude\b|\bwith honors\b|\bdean.s list\b'
+      redirect_expected: true
+    forbidden: default
+    max_chars: 600
+  expect: pass
+  facts_ref: [never.gpa]
+
+- id: un-006
+  category: unanswerable
+  surface: chat
+  question: "How much AWS has he used? We're all-in on EC2 and Lambda."
+  graders:
+    abstention:
+      required: true
+      forbidden_assertions:
+        - '\b(has|used|worked with|experience with|familiar with)\b.{0,30}\b(AWS|EC2|Lambda|S3)\b'
+        - '\b(AWS|EC2|Lambda|S3)\b.{0,30}\b(experience|background|proficien)'
+        - '\b(transferable|similar|comparable|maps? (well )?to)\b.{0,40}\b(AWS|EC2|Lambda)\b'
+      redirect_expected: true
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 900
+  expect: fail
+  facts_ref: [never.aws]
+  hypothesis: >
+    The hardest abstention in the set, and deliberately so. The recruiter names a
+    stack and the true answer (Vercel, Firebase) is genuinely adjacent, so the
+    advocate framing will want to bridge — "no AWS specifically, but his Firebase
+    and Vercel deployment work transfers directly." That bridge is a positive
+    assertion about the queried attribute and fails half 2. The acceptable
+    version names what he HAS deployed with WITHOUT claiming transferability.

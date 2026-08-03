@@ -1,0 +1,21 @@
+Forward-Deployed Engineer
+Series A AI infrastructure startup · New York, NY · Hybrid
+
+You'll be our third forward-deployed hire. Half your week is writing code —
+TypeScript, React, Node — and half is sitting in customer offices figuring out
+what they actually need, which is rarely what the ticket says.
+
+What you'll do
+- Embed with design-partner customers, scope integrations, and ship them yourself
+- Build internal tooling that makes the next deployment faster than the last
+- Translate messy, non-technical requirements into working software
+- Own a customer outcome end to end, from first call to production
+
+What we're looking for
+- Strong TypeScript/React fundamentals; comfortable across the stack
+- You've shipped something real and watched people use it
+- Genuinely enjoys talking to non-engineers — this is not a nice-to-have
+- Comfortable with ambiguity and no process; we're making it up as we go
+- Experience with LLM APIs is a plus
+
+Level: open. We care more about the build-plus-talk combination than years.

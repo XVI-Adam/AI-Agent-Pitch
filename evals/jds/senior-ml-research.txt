@@ -1,0 +1,17 @@
+Senior Machine Learning Engineer, Research
+AI research lab · London or Zurich
+
+You will train and evaluate large-scale models, working alongside our research
+scientists to turn papers into production systems.
+
+Responsibilities
+- Design and run distributed training jobs across multi-node GPU clusters
+- Implement and ablate novel architectures from recent literature
+- Own model evaluation infrastructure and benchmark reproducibility
+- Publish at top-tier venues (NeurIPS, ICML, ICLR)
+
+Requirements
+- PhD in ML, CS, or related field, or equivalent research output
+- 5+ years training large models; deep PyTorch and CUDA fluency
+- Publication record at top-tier ML conferences
+- Strong grounding in optimization, distributed systems, and numerical methods

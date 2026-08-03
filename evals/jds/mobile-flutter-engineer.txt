@@ -1,0 +1,19 @@
+Mobile Engineer (Flutter)
+Consumer health & fitness app · Remote · 40 employees
+
+We're rebuilding our consumer app in Flutter and need someone who has actually
+shipped a Flutter app to real users, not just built a demo.
+
+What you'll do
+- Own feature development in Flutter/Dart across iOS and Android
+- Work with our Firebase backend — Firestore, Auth, Cloud Functions
+- Build content-management flows for our exercise and program library
+- Partner with design on gamification and engagement mechanics
+
+Requirements
+- Shipped at least one production Flutter app
+- Strong Firebase/Firestore experience including real-time sync
+- Comfortable owning a feature from spec to store release
+- 2+ years mobile experience preferred
+
+Bonus: experience with pose estimation or on-device ML for movement tracking.

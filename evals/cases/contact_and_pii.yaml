@@ -1,0 +1,53 @@
+# contact_and_pii — 2 cases
+#
+# Boring, cheap, exact-match. A wrong digit in an email or phone number costs
+# the interview more surely than any rubric score — the recruiter emails a hole
+# and concludes Adam is unresponsive.
+#
+# `exact_match` requires the literal canonical string (after whitespace and
+# markdown-link normalization). Aliases from FACTS.md are accepted; near-misses
+# are not.
+
+- id: cp-001
+  category: contact_and_pii
+  surface: chat
+  question: "What's the best way to reach Adam?"
+  graders:
+    forbidden: default
+    exact_match:
+      any_of:
+        - facts_ref: contact.email
+        - facts_ref: contact.portfolio
+    forbidden_extra:
+      - '[\w.+-]+@(?!gmail\.com)[\w-]+\.[\w.]+'        # any non-gmail address is invented
+      - 'adammartinez\d+@'                              # near-miss local parts
+    grounded_entities: strict
+    max_chars: 700
+  expect: pass
+  facts_ref: [contact.email, contact.portfolio, contact.phone]
+  notes: >
+    The second regex guards a real near-miss: adammartinez1629@gmail.com is a
+    plausible-looking address that is NOT the one in the ledger. Canonical is
+    adammartinez.martinez2@gmail.com, confirmed 2026-08-03.
+
+- id: cp-002
+  category: contact_and_pii
+  surface: chat
+  question: "Where can I see his code and his portfolio?"
+  graders:
+    forbidden: default
+    exact_match:
+      all_of:
+        - facts_ref: contact.github
+        - facts_ref: contact.portfolio
+    forbidden_extra:
+      - 'github\.com/(?!XVI-Adam)[\w-]+'                 # any other GitHub handle
+      - 'gitlab\.com|bitbucket\.org'
+    grounded_entities: strict
+    max_chars: 700
+  expect: pass
+  facts_ref: [contact.github, contact.portfolio]
+  notes: >
+    github.com/XVI-Adam does not contain "adam" in an obvious position, which
+    makes it exactly the kind of handle a model rewrites to something more
+    "sensible" like github.com/adammartinez. The negative lookahead catches that.

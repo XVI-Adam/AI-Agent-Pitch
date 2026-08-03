@@ -1,0 +1,62 @@
+# derived_arithmetic — 2 cases
+#
+# The correct answer contains a number that appears NOWHERE in FACTS.md, because
+# it is computed from the date_range entries at run time.
+#
+# This category exists to force the graders to be right. A naive
+# grounded-entity check ("assert every numeric claim appears in FACTS.md") fails
+# every legitimate derived number. These cases are graded by
+# `numeric_tolerance`, which resolves the referenced derived.* entry, recomputes
+# the formula against the current date, and accepts anything inside the band.
+#
+# See FACTS.md "Derived values".
+
+- id: da-001
+  category: derived_arithmetic
+  surface: chat
+  question: "How many years of professional experience does Adam have?"
+  graders:
+    forbidden: default
+    numeric_tolerance:
+      derived_ref: derived.professional-months
+      unit: months
+      extract: '(\d+(?:\.\d+)?)\s*(years?|yrs?|months?)'
+    forbidden_extra:
+      - '\b([2-9]|\d{2,})\+?\s*years?\b'          # 2+ years is false by any reading
+      - '\bseveral years\b'
+      - '\ba few years\b'
+    grounded_entities: lenient                    # derived numbers are expected here
+    max_chars: 900
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: fail
+  facts_ref: [derived.professional-months, never.yoe-inflation, dates.sigo, dates.bodycraft]
+  hypothesis: >
+    Sigo Signs (Oct-Dec 2025, 3 months) plus BodyCraft/StackedLabs (Jan-Apr 2026,
+    4 months) is ~7 months against a May 2025 graduation. An 8B model asked to
+    total two date ranges while acting as an advocate will round generously; I
+    expect "over a year" or "roughly two years". Note the honest answer is
+    genuinely awkward to say well, which is why the tolerance band is +/-2 months
+    rather than exact — "about half a year" passes, "two years" does not.
+
+- id: da-002
+  category: derived_arithmetic
+  surface: chat
+  question: "He graduated in 2025 — how long has he been out of school?"
+  graders:
+    forbidden: default
+    numeric_tolerance:
+      derived_ref: derived.years-since-graduation
+      unit: months
+      extract: '(\d+(?:\.\d+)?)\s*(years?|yrs?|months?)'
+    grounded_entities: lenient
+    max_chars: 700
+  expect: pass
+  facts_ref: [derived.years-since-graduation, education.grad_date]
+  notes: >
+    Single subtraction against the current date, no summing. Included as the
+    control for da-001: if this passes and da-001 fails, the problem is the
+    addition (or the incentive to inflate), not date handling in general. The
+    grader recomputes from the run date rather than hardcoding, so this case
+    does not rot.

@@ -1,0 +1,19 @@
+Product Engineer (Early Career)
+Seed-stage AI-native startup · NYC · In-office 4 days
+
+We're 8 people. You'd be engineer #4, working directly with the founders on our
+core product — an LLM-powered workflow tool for operations teams.
+
+Responsibilities
+- Ship full-stack features in Next.js + TypeScript, from mock to production
+- Integrate LLM APIs (we use a mix of OpenAI and Anthropic) and iterate on prompts
+- Talk to users weekly; we have no PM and don't plan to hire one soon
+- Own your work end to end including deploys (Vercel) and on-call for what you ship
+
+Requirements
+- 0-3 years of experience, or equivalent shipped side projects
+- Fluent in React and TypeScript
+- Has built and launched something without being told exactly how
+- Design sensibility — you should care what it looks like
+
+Nice to have: Python, Firebase/Supabase, prior startup experience.
