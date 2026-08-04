@@ -237,3 +237,23 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
   }
   return lines.join('\n');
 }
+
+/**
+ * The only thing CI actually blocks on: cases that passed against the baseline
+ * and fail now, minus anything tracked in expected_failures.json.
+ *
+ * A case that was ALREADY failing is not a regression, and a case absent from
+ * the baseline (newly added) is not one either -- otherwise every new
+ * `expect: fail` case would break the build the day it lands.
+ */
+export function newRegressions(report: RunReport, baseline: RunReport | undefined): string[] {
+  const grouped = byCase(report.outcomes);
+  const baselineGrouped = byCase(baseline?.outcomes ?? []);
+
+  const baselinePassing = new Set(
+    [...baselineGrouped.entries()].filter(([, s]) => s.every((o) => o.passed)).map(([id]) => id),
+  );
+  const nowFailing = [...grouped.entries()].filter(([, s]) => s.some((o) => !o.passed)).map(([id]) => id);
+
+  return nowFailing.filter((id) => baselinePassing.has(id) && !(id in report.expectedFailures));
+}

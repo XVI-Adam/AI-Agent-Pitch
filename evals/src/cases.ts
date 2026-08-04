@@ -28,7 +28,7 @@ export function loadCases(dir = CASES_DIR): EvalCase[] {
     try {
       parsed = parse(readFileSync(join(dir, file), 'utf8'));
     } catch (err) {
-      throw new Error(`${file}: malformed YAML — ${(err as Error).message}`);
+      throw new Error(`${file}: malformed YAML — ${(err as Error).message}`, { cause: err });
     }
     if (!Array.isArray(parsed)) throw new Error(`${file}: expected a list of cases`);
 

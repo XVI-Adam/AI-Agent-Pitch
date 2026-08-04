@@ -17,6 +17,7 @@ import {
 } from '../src/graders/forbidden.ts';
 import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema.ts';
 import { loadCases, filterCases } from '../src/cases.ts';
+import { newRegressions, type CaseOutcome, type RunReport } from '../src/report.ts';
 import { firstAssertion, isNegatedMention } from '../src/negation.ts';
 import type { FitReport } from '../../src/types/fit.ts';
 
@@ -478,5 +479,57 @@ describe('negation awareness', () => {
       { mode: 'strict' },
     );
     expect(result.passed, JSON.stringify(result.findings)).toBe(true);
+  });
+});
+
+// The single decision CI blocks on. It lived in run.ts, which calls main() at
+// import time, so it was untestable until it moved to report.ts.
+describe('newRegressions', () => {
+  const outcome = (id: string, passed: boolean): CaseOutcome =>
+    ({
+      id, category: 'x', surface: 'chat', question: 'q', expect: 'pass',
+      response: '', passed, graders: [], latencyMs: 0, tokens: 0, retries: 0,
+      cached: false, sample: 0,
+    }) as CaseOutcome;
+
+  const report = (outcomes: CaseOutcome[], expectedFailures: Record<string, string> = {}): RunReport =>
+    ({
+      timestamp: '', model: 'm', temperature: 0, samples: 1,
+      consistency: { grader: 'facts_consistency', passed: true, findings: [] },
+      outcomes, errors: [], expectedFailures,
+    }) as RunReport;
+
+  it('flags a case that passed in baseline and fails now', () => {
+    const baseline = report([outcome('a', true), outcome('b', true)]);
+    const current = report([outcome('a', true), outcome('b', false)]);
+    expect(newRegressions(current, baseline)).toEqual(['b']);
+  });
+
+  it('does not flag a case that was already failing', () => {
+    const baseline = report([outcome('a', false)]);
+    expect(newRegressions(report([outcome('a', false)]), baseline)).toEqual([]);
+  });
+
+  // Otherwise every new `expect: fail` case would break the build the day it lands.
+  it('does not flag a newly added failing case absent from the baseline', () => {
+    const baseline = report([outcome('a', true)]);
+    const current = report([outcome('a', true), outcome('new', false)]);
+    expect(newRegressions(current, baseline)).toEqual([]);
+  });
+
+  it('does not flag a regression that is tracked in expected_failures', () => {
+    const baseline = report([outcome('a', true)]);
+    const current = report([outcome('a', false)], { a: 'known, TODO: fix the prompt' });
+    expect(newRegressions(current, baseline)).toEqual([]);
+  });
+
+  it('treats a case as failing if ANY sample failed', () => {
+    const baseline = report([outcome('a', true)]);
+    const current = report([outcome('a', true), outcome('a', false)]);
+    expect(newRegressions(current, baseline)).toEqual(['a']);
+  });
+
+  it('reports nothing when there is no baseline at all', () => {
+    expect(newRegressions(report([outcome('a', false)]), undefined)).toEqual([]);
   });
 });

@@ -14,7 +14,9 @@ const PUNCT_MAP: Array<[RegExp, string]> = [
   [/[→⇒➡]/g, '->'],
   [/[×]/g, 'x'],
   [/[…]/g, '...'],
-  [/[   ]/g, ' '],
+  // NBSP, figure space, narrow NBSP — spelled as escapes because they are
+  // invisible in source and eslint rejects irregular whitespace literals.
+  [/[\u00a0\u2007\u202f]/g, ' '],
 ];
 
 /** Strips markdown that wraps otherwise-matching text. */

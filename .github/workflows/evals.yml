@@ -45,24 +45,31 @@ jobs:
         id: eval
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        # Concurrency 2 on CI: shared runners plus a free-tier key means the
-        # backoff earns its keep, but a slow green run beats a fast flaky one.
-        run: npm run eval -- --concurrency=2
+        # Concurrency 1: the free tier is 6000 TPM and ~2k-token prompts mean
+        # even two in flight exceeds it. The backoff copes either way, but a
+        # slow green run beats a fast one that drops cases.
+        #
+        # --summary prints only the tables. The full report embeds every failing
+        # response verbatim and is uploaded as an artifact instead.
+        shell: bash
+        run: |
+          # pipefail is NOT on by default in Actions' bash, and without it `tee`
+          # supplies the exit code -- which would silently turn every regression
+          # into a green check.
+          set -o pipefail
+          npm run eval -- --concurrency=1 --summary | tee eval-summary.md
         continue-on-error: true
 
       - name: Build PR comment
         id: summary
         if: always()
         run: |
-          LATEST=$(ls -1 evals/results/*.md 2>/dev/null | tail -1)
           {
             echo 'body<<EVALREPORT'
-            if [ -n "$LATEST" ]; then
-              # The full report includes every failing response verbatim, which
-              # is too long for a comment. Take the header and the tables.
-              sed -n '1,/^## Failures/p' "$LATEST" | sed '$d'
+            if [ -s eval-summary.md ]; then
+              cat eval-summary.md
               echo ''
-              echo "<sub>Full report: \`$LATEST\` in the run artifacts.</sub>"
+              echo '<sub>Full report with every failing response: see the `eval-results` artifact.</sub>'
             else
               echo '⚠️ The eval run produced no report — check the job log.'
             fi

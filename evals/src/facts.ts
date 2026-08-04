@@ -35,7 +35,7 @@ export function parseFactsMarkdown(markdown: string): FactEntry[] {
     try {
       parsed = parse(body);
     } catch (err) {
-      throw new Error(`FACTS.md: malformed YAML block: ${(err as Error).message}`);
+      throw new Error(`FACTS.md: malformed YAML block: ${(err as Error).message}`, { cause: err });
     }
     if (!Array.isArray(parsed)) {
       throw new Error('FACTS.md: every yaml block must be a list of entries');

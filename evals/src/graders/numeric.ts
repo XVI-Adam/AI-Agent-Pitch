@@ -52,14 +52,14 @@ export function resolveDerived(
   const formula = entry.formula ?? '';
 
   if (/^now\s*-/.test(formula)) {
-    const ref = /([\w.\-]+)\s*\(/.exec(formula)?.[1];
+    const ref = /([\w.-]+)\s*\(/.exec(formula)?.[1];
     const anchorEntry = ref ? ledger.byId.get(ref) : undefined;
     const anchor = anchorEntry ? parseAnchorDate(anchorEntry.canonical) : undefined;
     if (!anchor) return { error: `cannot resolve anchor date for formula "${formula}"` };
     return { months: monthsBetween(anchor, now), tolerance };
   }
 
-  const refs = [...formula.matchAll(/([\w.\-]+)\s*\(\s*\d+\s*\)/g)].map((m) => m[1]);
+  const refs = [...formula.matchAll(/([\w.-]+)\s*\(\s*\d+\s*\)/g)].map((m) => m[1]);
   if (refs.length > 0) {
     let total = 0;
     for (const ref of refs) {

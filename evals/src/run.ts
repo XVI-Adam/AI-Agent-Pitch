@@ -8,7 +8,13 @@ import { loadLedger } from './facts.ts';
 import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, mapWithConcurrency } from './groq.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
 import { runJudge } from './graders/judge.ts';
-import { renderMarkdown, type CaseOutcome, type RunReport } from './report.ts';
+import {
+  newRegressions,
+  renderMarkdown,
+  renderSummaryTable,
+  type CaseOutcome,
+  type RunReport,
+} from './report.ts';
 import type { EvalCase, GraderResult } from './types.ts';
 
 // The runner. Builds prompts from the SAME modules the endpoints use, calls
@@ -26,10 +32,11 @@ interface Args {
   model: string;
   judgeModel: string;
   json: boolean;
+  summary: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false };
+  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false, summary: false };
   for (const arg of argv) {
     const [flag, value] = arg.includes('=') ? arg.split(/=(.*)/s) : [arg, undefined];
     switch (flag) {
@@ -40,6 +47,7 @@ function parseArgs(argv: string[]): Args {
       case '--model': if (value) args.model = value; break;
       case '--judge-model': if (value) args.judgeModel = value; break;
       case '--json': args.json = true; break;
+      case '--summary': args.summary = true; break;
       case '--help':
         console.log(`Usage: npm run eval -- [options]
 
@@ -49,7 +57,8 @@ function parseArgs(argv: string[]): Args {
   --no-cache               ignore the response cache and re-spend quota
   --model=<id>             override the model under test (default ${DEFAULT_MODEL})
   --judge-model=<id>       override the judge (default ${DEFAULT_JUDGE_MODEL})
-  --json                   print the JSON report to stdout instead of markdown`);
+  --json                   print the JSON report to stdout instead of markdown
+  --summary                print only the compact table (what CI posts to a PR)`);
         process.exit(0);
     }
   }
@@ -230,21 +239,19 @@ async function main(): Promise<void> {
 
   const markdown = renderMarkdown(report, baseline);
   writeFileSync(join(RESULTS_DIR, `${stamp}.md`), markdown);
-  console.log(args.json ? JSON.stringify(report, null, 2) : markdown);
+
+  // --summary exists so CI does not have to slice the full report with sed.
+  // The full report embeds every failing response verbatim; a PR comment wants
+  // the tables only.
+  if (args.json) console.log(JSON.stringify(report, null, 2));
+  else if (args.summary) console.log(renderSummaryTable(report, baseline));
+  else console.log(markdown);
   process.stderr.write(`\nWrote evals/results/${stamp}.json and .md\n`);
 
   // Exit non-zero only on NEW regressions, so pre-existing known failures
   // tracked in expected_failures.json don't block every PR.
   const regressions = newRegressions(report, baseline);
   process.exit(regressions.length > 0 ? 1 : 0);
-}
-
-export function newRegressions(report: RunReport, baseline: RunReport | undefined): string[] {
-  const baselinePassing = new Set(
-    (baseline?.outcomes ?? []).filter((o) => o.passed).map((o) => o.id),
-  );
-  const nowFailing = new Set(report.outcomes.filter((o) => !o.passed).map((o) => o.id));
-  return [...nowFailing].filter((id) => baselinePassing.has(id) && !(id in report.expectedFailures));
 }
 
 main().catch((err) => {
