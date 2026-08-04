@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { SYSTEM_PROMPT } from '../../src/data/context.ts';
 import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
@@ -77,5 +79,64 @@ describe('prompt leak', () => {
     }
     const conflicts = [...ledger.allowedPhrases].filter((p) => banned.has(p));
     expect(conflicts).toEqual([]);
+  });
+});
+
+// `src/data/context.ts` is a PURE DATA MODULE: exported constants, no imports,
+// no I/O. It ships in the browser bundle, so a `node:` specifier there is a
+// build break, and any disk read makes the grounding data depend on a runtime
+// that two of its three consumers (browser, Edge function) do not have.
+//
+// The harness may read FACTS.md from disk as much as it likes — that I/O lives
+// in evals/, which nothing in the app imports. The dependency runs one way:
+// evals -> app, never app -> evals. These assert that boundary instead of
+// trusting it, because the pressure to "just read the ledger here" is exactly
+// the kind of convenience that looks fine until the bundle breaks.
+describe('app/harness boundary', () => {
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+
+  const PURE_MODULES = [
+    '../../src/data/context.ts',
+    '../../api/_lib/buildFitPrompt.ts', // Edge runtime — no fs there either
+  ];
+
+  it.each(PURE_MODULES)('%s declares no runtime I/O', (rel) => {
+    const source = read(rel);
+    const banned: Array<[RegExp, string]> = [
+      [/from\s+['"]node:/, 'imports a node: builtin'],
+      [/require\s*\(/, 'uses require()'],
+      [/\breadFileSync\b|\breadFile\b|\bwriteFileSync\b/, 'performs file I/O'],
+      [/\bprocess\.(?:env|cwd|argv)\b/, 'reads process state'],
+      [/\bimport\.meta\.(?:url|dirname)\b/, 'resolves paths at runtime'],
+      [/\b__dirname\b|\b__filename\b/, 'uses CommonJS path globals'],
+    ];
+    for (const [pattern, why] of banned) {
+      expect(pattern.test(source), `${rel} ${why}`).toBe(false);
+    }
+  });
+
+  it('context.ts imports nothing at all', () => {
+    const source = read('../../src/data/context.ts');
+    const imports = source.match(/^\s*import\b.*$/gm) ?? [];
+    expect(imports).toEqual([]);
+  });
+
+  it('context.ts exports only constants', () => {
+    const source = read('../../src/data/context.ts');
+    const exports = (source.match(/^export\s+\S+\s+\S+/gm) ?? []).map((line) => line.trim());
+    expect(exports.every((line) => line.startsWith('export const'))).toBe(true);
+    expect(exports.length).toBeGreaterThan(0);
+  });
+
+  // One-directional: the harness reaches into the app, never the reverse.
+  it('no app module imports the harness', () => {
+    const appFiles = [
+      '../../src/data/context.ts',
+      '../../api/_lib/buildFitPrompt.ts',
+      '../../api/_lib/validateFitReport.ts',
+    ];
+    for (const rel of appFiles) {
+      expect(/from\s+['"][^'"]*evals\//.test(read(rel)), `${rel} imports from evals/`).toBe(false);
+    }
   });
 });
