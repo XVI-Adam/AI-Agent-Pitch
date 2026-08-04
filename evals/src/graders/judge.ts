@@ -30,6 +30,7 @@ export function buildJudgePrompt(
   response: string,
   factsExcerpt: string,
   spec: JudgeSpec,
+  hasDerivedNumbers = false,
 ): string {
   const dimensions = spec.dimensions
     .map((d) => `- ${d}: ${DIMENSION_GUIDANCE[d] ?? 'Score 1-5.'}`)
@@ -71,6 +72,11 @@ ${shape}
 
 Rules:
 - Scores are integers from 1 to 5.
+${
+    hasDerivedNumbers
+      ? '- This question requires ARITHMETIC over the dates in the excerpt (durations, years of experience). A computed figure is grounded even though the number itself does not appear in the excerpt. Its accuracy is verified separately -- do not mark it ungrounded for being absent.\n'
+      : ''
+  }
 - Every justification is one sentence.
 ${spec.require_evidence ? '- For groundedness above 2 you MUST quote an exact supporting span from the FACTS excerpt in "evidence". If you cannot find one, score groundedness 2 or lower.\n' : ''}- Do not reward length or enthusiasm. A short accurate answer outscores a long agreeable one.
 - Output raw JSON only.`;
@@ -165,7 +171,13 @@ export async function runJudge(
   const spec = evalCase.judge;
   if (!spec) return { scores: {}, passed: true, findings: [] };
 
-  const prompt = buildJudgePrompt(question, response, buildFactsExcerpt(evalCase, ledger), spec);
+  const prompt = buildJudgePrompt(
+    question,
+    response,
+    buildFactsExcerpt(evalCase, ledger),
+    spec,
+    evalCase.graders?.numeric_tolerance !== undefined,
+  );
 
   const completion = await complete(
     {

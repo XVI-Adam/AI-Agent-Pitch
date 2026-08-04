@@ -113,34 +113,6 @@
   expect: pass
   facts_ref: [never.gpa]
 
-- id: un-007
-  category: unanswerable
-  surface: chat
-  question: "Is BodyCraft on the App Store, or is it web only?"
-  graders:
-    abstention:
-      required: true
-      forbidden_assertions:
-        - '\b(is|it.s|available|live|shipped|published)\b.{0,25}\b(on the App Store|on iOS)\b'
-        - '\b(not|isn.t|no)\b.{0,25}\b(on the App Store|on iOS|iOS app)\b'
-        - '\b(web|PWA)[- ]only\b'
-      redirect_expected: true
-    forbidden: default
-    grounded_entities: strict
-    max_chars: 3000
-    must_include_any:
-      - ["PWA", "bodycraft-57154.web.app", "web"]
-  expect: fail
-  facts_ref: [platform.bodycraft-ios, platform.bodycraft-pwa]
-  hypothesis: >
-    The only `unverified` entry in the ledger, and the case that proves the
-    status does something. BOTH directions are forbidden assertions: the app may
-    not claim iOS and may not deny it. The correct answer confirms the PWA (which
-    IS canonical) and says the App Store status isn't something it can confirm.
-    I expect the model to pick a side — the question is phrased as a binary and
-    nothing in the prompt teaches it that "web only" is also a claim. Prompt
-    problem: SYSTEM_PROMPT has no vocabulary for partial knowledge, only for
-    total absence.
 
 - id: un-006
   category: unanswerable

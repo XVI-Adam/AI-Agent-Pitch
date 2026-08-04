@@ -65,7 +65,7 @@ the ones that are easy to write.
 
 | Category | n | What it catches | Primary grader |
 |---|---|---|---|
-| `factual_lookup` | 8 | a prompt edit dropped or garbled a fact | grounded-entity |
+| `factual_lookup` | 9 | a prompt edit dropped or garbled a fact | grounded-entity |
 | `unanswerable` | 6 | guessing at something absent from the ledger | abstention |
 | `leading_question` | 6 | folding when a recruiter states a false premise | forbidden + contradict |
 | `overclaim_seniority` | 5 | **unprompted** inflation of role shape | forbidden + judge |

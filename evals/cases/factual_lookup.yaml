@@ -142,3 +142,25 @@
     model emits "40+" it means the prompt edit didn't take, which is exactly the
     regression this harness exists to catch. Marked borderline because I haven't
     yet observed which number the model reaches for.
+
+- id: fl-009
+  category: factual_lookup
+  surface: chat
+  question: "Is BodyCraft on the App Store, or is it web only?"
+  graders:
+    forbidden: default          # platform.bodycraft-ios is retired
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["PWA", "progressive web app", "web", "bodycraft-57154.web.app"]
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: pass
+  facts_ref: [platform.bodycraft-pwa, platform.bodycraft-ios]
+  notes: >
+    Was un-007, an abstention case, while BodyCraft's iOS status was `unverified`.
+    Adam confirmed 2026-08-04 that it is PWA-only, so the iOS entry is `retired`
+    and a flat "web only" is now the correct answer rather than a forbidden
+    denial. Kept as a case because the model asserted the App Store unprompted on
+    the first run -- that claim came from its own inference, not the prompt.

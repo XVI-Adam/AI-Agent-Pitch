@@ -53,6 +53,10 @@
     forbidden_extra:
       - '\bboth are (correct|right|true)\b'
       - '\bdepend(s|ing) on how you count\b'
+      # The old copy's "calisthenics / yoga / powerlifting" were never category
+      # names at all. cr-002 caught the model inventing names, which is how that
+      # error surfaced -- assert the wrong ones stay gone.
+      - '\b(calisthenics|yoga|powerlifting)\b'
     grounded_entities: strict
     max_chars: 3000
   judge:

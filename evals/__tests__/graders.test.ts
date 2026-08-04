@@ -50,10 +50,20 @@ describe('normalize', () => {
 });
 
 describe('FACTS.md ledger', () => {
-  it('parses without error and yields every status', () => {
+  it('parses without error and yields the forbidden set', () => {
     expect(ledger.entries.length).toBeGreaterThan(50);
     expect(ledger.forbidden.length).toBeGreaterThan(10);
-    expect(ledger.unverified.length).toBeGreaterThan(0);
+  });
+
+  // `unverified` may legitimately be empty -- every fact happens to be confirmed
+  // right now. Assert the STATUS is supported, not that something uses it,
+  // otherwise confirming the last unknown fact breaks the suite.
+  it('supports the unverified status even when no entry carries it', () => {
+    const md = '```yaml\n- id: a.b\n  canonical: "x"\n  status: unverified\n```';
+    const parsed = buildLedger(parseFactsMarkdown(md));
+    expect(parsed.unverified).toHaveLength(1);
+    expect(parsed.allowed).toHaveLength(1);   // allowed to be mentioned...
+    expect(parsed.forbidden).toHaveLength(0); // ...but never asserted
   });
 
   it('rejects a duplicate id', () => {

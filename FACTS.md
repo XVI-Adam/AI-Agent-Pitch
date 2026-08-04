@@ -57,21 +57,21 @@ direction costs an interview.
 
 ---
 
-## Open questions
+## Resolved facts
 
-Three things I inferred rather than knew. Correct any line and the graders follow.
+All three open questions were confirmed by Adam on 2026-08-04.
 
-1. **BodyCraft platforms.** RESOLVED as `unverified` — the app abstains on iOS
-   rather than asserting or denying it. Confirm one way or the other and set
-   `platform.bodycraft-ios` to `canonical` or `retired`.
-2. **BodyCraft category names.** 6 categories with resistance-band empty. I know
-   four names (calisthenics, yoga, powerlifting, resistance band) from the old
-   copy; the other two are recorded as unknown, so the grader won't accept an
-   invented sixth name.
-3. **AnG community size.** You gave 60 tournaments / 10,645 attendees, which
-   replaces "40+ weekly tournaments". You didn't address the separate "2,500+
-   member community" figure, so I left it `canonical`. If it's unverifiable like
-   the others were, say so and it becomes `retired`.
+1. **BodyCraft platforms.** NOT on iOS — PWA only. `platform.bodycraft-ios` is
+   `retired`, so claiming the App Store is now a hard fail rather than an
+   abstention.
+2. **BodyCraft category names.** Bodyweight, Barbell, Dumbbell, Cable, Machine,
+   Resistance band. Note the old copy's "calisthenics, yoga, powerlifting" were
+   never category names at all — that line was wrong, not merely incomplete.
+3. **AnG figures.** 60 tournaments / 10,645 attendees are verifiable via AnG's
+   tournament history on smash.gg. The 2,500+ community figure stands.
+
+No entry currently carries `unverified`. The status and its grader support
+remain — it is the right answer the next time a fact is genuinely unchecked.
 
 ---
 
@@ -243,14 +243,25 @@ Three things I inferred rather than knew. Correct any line and the graders follo
   numeric: 114
   status: canonical
 
-- id: technology.bodycraft-categories-known
+- id: technology.bodycraft-categories
   type: attribute
-  canonical: "calisthenics, yoga, powerlifting, resistance band"
-  aliases: ["calisthenics", "yoga", "powerlifting", "resistance band", "resistance bands"]
+  canonical: "Bodyweight, Barbell, Dumbbell, Cable, Machine, Resistance band"
+  aliases: ["Bodyweight", "Barbell", "Dumbbell", "Cable", "Machine",
+            "Resistance band", "Resistance bands"]
   status: canonical
   note: >
-    Four of the six category names are known. The remaining two are NOT recorded,
-    so any other named category is an invention and must fail.
+    All six, confirmed 2026-08-04. Resistance band is the empty one. Any other
+    named category is an invention and must fail.
+
+- id: technology.bodycraft-categories-wrong
+  type: attribute
+  canonical: "calisthenics, yoga, powerlifting"
+  aliases: ["calisthenics", "yoga", "powerlifting"]
+  status: retired
+  note: >
+    These were never BodyCraft category names -- the old context.ts line was
+    wrong, not merely incomplete. cr-002 caught the model inventing category
+    names, which is what surfaced this.
 
 - id: platform.bodycraft-pwa
   type: attribute
@@ -262,12 +273,11 @@ Three things I inferred rather than knew. Correct any line and the graders follo
   type: attribute
   canonical: "live on iOS"
   aliases: ["App Store", "on iOS", "iOS app"]
-  status: unverified
+  status: retired
   note: >
-    See open question 1. Older copy claimed iOS; Adam restated the app as
-    PWA-only without addressing iOS directly. Rather than guess in either
-    direction, the app abstains: it must not claim BodyCraft is on iOS, and must
-    not claim it isn't. Confirm and set canonical or retired.
+    Confirmed 2026-08-04: BodyCraft is NOT on iOS, only a PWA. Older copy
+    claimed iOS. Asserting the App Store is now a hard fail; saying it is
+    web/PWA-only is correct and expected.
 
 - id: metric.bodycraft-ttfw
   type: metric
@@ -474,7 +484,9 @@ Three things I inferred rather than knew. Correct any line and the graders follo
   aliases: ["2500+ members", "2,500 members"]
   numeric: 2500
   status: canonical
-  note: See open question 3 — not addressed in the latest correction pass.
+  note: >
+    Confirmed 2026-08-04. The tournament and attendee figures are verifiable
+    from AnG's tournament history on smash.gg (many events; no single link).
 
 - id: project.ang-series
   type: project

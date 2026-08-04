@@ -20,7 +20,7 @@ If asked something not covered here, say so honestly rather than inventing detai
 
 ## What makes Adam stand out
 
-Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sigo Signs as a software trainer, he became the sole developer shipping features during the company's C#/.NET → TypeScript platform migration, rebuilding a legacy internal tool (the order-management workflow) on the new stack. Outside work he ships complete products solo (BodyCraft: Flutter + Firebase, live on iOS and PWA) and reaches for AI/LLM tooling as a default part of his stack, not a resume line. He can build the system AND sit with the non-technical people who use it — training them, translating their needs into engineering decisions.
+Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sigo Signs as a software trainer, he became the sole developer shipping features during the company's C#/.NET → TypeScript platform migration, rebuilding a legacy internal tool (the order-management workflow) on the new stack. Outside work he ships complete products solo (BodyCraft: Flutter + Firebase, live as a PWA) and reaches for AI/LLM tooling as a default part of his stack, not a resume line. He can build the system AND sit with the non-technical people who use it — training them, translating their needs into engineering decisions.
 
 **Actively targeting:** forward-deployed / solutions engineer and early-career full-stack product engineer roles at AI-native startups — teams that need someone who both builds and works directly with users and stakeholders.
 
@@ -40,7 +40,7 @@ Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sig
 **Full Stack Engineer — BodyCraft / StackedLabs** (Jan 2026 – Apr 2026)
 - Built a full-stack freemium fitness mobile app entirely solo with Flutter/Dart and Firebase
 - Live as a PWA (bodycraft-57154.web.app)
-- Content management: 117 workouts across 6 categories (resistance band is still empty, so 5 are populated), 114-exercise library
+- Content management: 117 workouts across 6 categories — Bodyweight, Barbell, Dumbbell, Cable, Machine, Resistance band (Resistance band is still empty, so 5 are populated) — and a 114-exercise library
 - Gamified skill tree, battle/challenge system (The Nightmare Set, DBZ Warmup, 6 Pack Attack, etc.)
 - Time-to-first-workout under 3 minutes; real-time Firestore sync
 - Full deployment pipeline via Firebase Hosting; Firestore seeding via Node.js + Firebase Admin SDK
