@@ -1,6 +1,7 @@
 import type { FactsLedger } from '../facts.ts';
 import type { EvalCase, GraderResult, GraderSpec } from '../types.ts';
 import { gradeAbstention } from './abstention.ts';
+import { gradeDurationCeilings } from './duration.ts';
 import { gradeExactMatch } from './exactMatch.ts';
 import { gradeEvidenceTrace, gradeFitSchema, gradeScoreBands } from './fitSchema.ts';
 import { gradeDateRange, gradeForbidden, gradeLength, gradeMustContradict, gradeMustInclude } from './forbidden.ts';
@@ -10,10 +11,18 @@ import { gradeNumericTolerance } from './numeric.ts';
 export { gradeFactsConsistency } from './grounded.ts';
 export { resolveDerived } from './numeric.ts';
 
-// Composes the deterministic layers for one case. Layer 4 (the LLM judge) runs
-// separately in the runner, and only when everything here passes — there is no
-// point spending a judge call to describe the tone of a response that already
-// invented an employer.
+// Composes the deterministic layers for one case.
+//
+// NOTHING SHORT-CIRCUITS. An earlier version stopped at the first failing layer
+// and skipped the judge whenever any deterministic grader failed. That made the
+// report actively misleading: da-001 surfaced a single line about
+// duration_ceiling -- which turned out to be a misattribution -- while the
+// judge, which would have named the real defect in the response's reasoning,
+// never ran at all. A report that shows one arbitrary failure out of several is
+// worse than a slow one.
+//
+// Every layer runs, every failure is reported, and results come back in layer
+// order so the cheap deterministic findings read first.
 
 export interface DeterministicOutcome {
   results: GraderResult[];
@@ -32,17 +41,24 @@ export function runDeterministicGraders(
   if (evalCase.surface === 'fit') {
     const schema = gradeFitSchema({ raw: response, jobDescription: options.jobDescription ?? '' });
     results.push(schema);
-    // Everything downstream reads fields off the report, so a schema failure is
-    // terminal for this case rather than a first finding among many.
-    if (!schema.report) {
-      return { results, passed: false };
+    if (schema.report) {
+      results.push(gradeScoreBands(schema.report, spec));
+      results.push(gradeEvidenceTrace(schema.report, spec, ledger, options.jobDescription ?? ''));
+    } else {
+      // No parsed report, so the band and evidence graders have nothing to read
+      // — but the raw text can still carry a banned claim, and saying so is more
+      // useful than reporting only "invalid JSON".
+      results.push(gradeForbidden(response, spec, ledger));
+      results.push(gradeDurationCeilings(response, ledger));
     }
-    results.push(gradeScoreBands(schema.report, spec));
-    results.push(gradeEvidenceTrace(schema.report, spec, ledger, options.jobDescription ?? ''));
     return finish(results);
   }
 
   results.push(gradeForbidden(response, spec, ledger));
+  // Duration ceilings run with the forbidden list rather than per-case: tenure
+  // inflation is not a case-specific risk, and a string denylist cannot catch
+  // "roughly half a year".
+  if (spec.forbidden === 'default') results.push(gradeDurationCeilings(response, ledger));
   results.push(gradeMustInclude(response, spec));
   results.push(gradeMustContradict(response, spec));
   results.push(gradeDateRange(response, spec));

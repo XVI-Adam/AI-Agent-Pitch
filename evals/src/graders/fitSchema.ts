@@ -4,6 +4,7 @@ import type { FactsLedger } from '../facts.ts';
 import type { Finding, GraderResult, GraderSpec } from '../types.ts';
 import { gradeGrounded } from './grounded.ts';
 import { gradeForbidden } from './forbidden.ts';
+import { gradeDurationCeilings } from './duration.ts';
 
 // JD Fit Rater graders.
 //
@@ -159,9 +160,11 @@ export function gradeEvidenceTrace(
   const grounded = gradeGrounded(prose, ledger, { mode: 'strict', extraAllowed: [jobDescription] });
   const forbidden = gradeForbidden(prose, spec, ledger);
 
+  const duration = gradeDurationCeilings(prose, ledger);
   const findings = [
     ...grounded.findings.map((f) => ({ ...f, grader: 'evidence_trace' })),
     ...forbidden.findings.map((f) => ({ ...f, grader: 'evidence_trace' })),
+    ...duration.findings.map((f) => ({ ...f, grader: 'evidence_trace' })),
   ];
   return { grader: 'evidence_trace', passed: findings.length === 0, findings };
 }

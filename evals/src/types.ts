@@ -14,6 +14,16 @@ export interface FactEntry {
   duration_months?: number;
   tolerance_months?: number;
   formula?: string;
+  /** never_true duration rules: the employer the ceiling applies to. */
+  entity?: string;
+  /** never_true duration rules: the maximum truthful tenure, in months. */
+  max_months?: number;
+  /** never_true entries banned by SHAPE rather than by literal string. */
+  patterns?: string[];
+  /** Start of an open-ended range; its length is computed at run time. */
+  start?: string;
+  /** Ongoing — carries no duration_months, by design. */
+  open_ended?: boolean;
   note?: string;
   description?: string;
 }

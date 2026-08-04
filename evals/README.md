@@ -343,6 +343,24 @@ judge call on the tone of a response that already invented an employer is waste.
 
 ---
 
+## When two graders disagree
+
+**Investigate, do not arbitrate.** If two graders report different verdicts on
+the same output, that is information — one of them is wrong, or they are
+measuring different things, and finding out which is the entire value of the
+disagreement. Do not resolve it by narrowing a grader's scope until you know
+what it was seeing.
+
+This is a rule because it was broken once, expensively. `numeric_tolerance`
+passed "approximately 8 months" of tenure while the judge scored the same
+response ungrounded. The disagreement was settled by making the arithmetic
+authoritative and telling the judge to stop looking — which removed the only
+grader reporting the real defect. The number was correct arithmetic performed on
+a job entry that did not exist.
+
+If you must narrow a grader, say so in the PR and name what stops catching the
+thing it used to catch.
+
 ## A grader lesson worth keeping
 
 The first end-to-end run failed `lq-001` on a **correct** answer. Asked "he was a

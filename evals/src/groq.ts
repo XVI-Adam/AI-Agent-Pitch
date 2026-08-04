@@ -44,9 +44,14 @@ export interface CompletionResult {
 }
 
 /**
- * Cache key. Deliberately covers everything that could change the output, so a
- * prompt edit invalidates automatically and re-running graders against
- * unchanged responses costs nothing.
+ * Cache key: a hash of the exact request.
+ *
+ * `params.messages` carries the BUILT prompt string — the system message for
+ * chat, the composed fit prompt for fit — so the key tracks what the model
+ * actually saw, not which file it came from. That distinction is the whole
+ * point: editing an unrelated line of `context.ts` used to invalidate all 61
+ * cases and cost hours of re-earning identical responses against a 6,000 TPM
+ * ceiling. Now only cases whose prompt genuinely differs miss.
  */
 export function cacheKey(params: CompletionParams): string {
   return createHash('sha256').update(JSON.stringify(params)).digest('hex').slice(0, 32);
@@ -91,6 +96,8 @@ export interface CompleteOptions {
   noCache?: boolean;
   /** Distinguishes repeated samples of the same case under --n. */
   cacheSalt?: string;
+  /** Fail on a cache miss instead of spending quota — used by PR CI. */
+  cachedOnly?: boolean;
   onRetry?: (info: { attempt: number; delayMs: number; reason: string }) => void;
 }
 
@@ -100,6 +107,13 @@ export async function complete(params: CompletionParams, options: CompleteOption
   if (!options.noCache) {
     const hit = readCache(key);
     if (hit) return hit;
+  }
+
+  if (options.cachedOnly) {
+    throw new Error(
+      'cache miss under --cached-only: this case has no stored response for the current prompt. ' +
+        'Run the full suite locally and commit the refreshed baseline.',
+    );
   }
 
   const maxRetries = options.maxRetries ?? 10;

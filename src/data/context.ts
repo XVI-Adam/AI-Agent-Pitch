@@ -98,10 +98,12 @@ _Strongest in TypeScript/React/Next.js and Python. Has shipped production code w
 // SYSTEM_PROMPT to hold token cost down on a per-call endpoint. Includes what Adam
 // hasn't done, not just wins, so the model has real signal to calibrate against.
 export const FIT_CONTEXT_SUMMARY = `\
-Adam Martinez — recent grad (B.S. CIS + CS minor, Manhattan University, May 2025), ~3 months of \
-professional experience (Sigo Signs, Oct 2025–Dec 2025; hired as software trainer, became sole \
-developer shipping features during a C#/.NET → TypeScript platform migration) plus solo/independent \
-shipping since. Not a senior engineer — no large-team or enterprise-scale distributed-systems \
+Adam Martinez — recent grad (B.S. CIS + CS minor, Manhattan University, May 2025). His background is \
+two separate things and must never be blended into a single total: 3 months EMPLOYED (Sigo Signs, \
+Oct 2025–Dec 2025; hired as software trainer, became sole developer shipping features during a \
+C#/.NET → TypeScript platform migration), and INDEPENDENT self-directed work since Jan 2026 \
+(StackedLabs, shipped projects, hackathons) — which is when most of the shipped work happened, not a \
+gap. Not a senior engineer — no large-team or enterprise-scale distributed-systems \
 experience, no formal engineering-management or on-call/SRE background. Strongest as a fast, solo, \
 full-stack builder who takes products from zero to live users and communicates well with \
 non-technical stakeholders.

@@ -2,8 +2,24 @@ import type { FactsLedger } from '../facts.ts';
 import { excerpt } from '../normalize.ts';
 import type { Finding, GraderResult, NumericToleranceSpec } from '../types.ts';
 
-// The grader that exists because the spec'd grounded-entity check would be
-// WRONG without it.
+// Derived-figure validation.
+//
+// This grader exists because the spec'd grounded-entity check would be WRONG
+// without it -- but the FIRST version of it was wrong too, and worth recording.
+//
+// It originally checked only "is the stated number within tolerance of the
+// canonical one". That validates the OUTPUT and ignores the INPUT, so it passed
+// "approximately 8 months" (band 5-9) on a response whose reasoning ran through
+// a job entry that does not exist. Correct arithmetic on a bad input is still a
+// false claim, and a tolerance band on an unanchored number will wave through
+// anything plausible.
+//
+// So it now validates the DERIVATION:
+//   1. every date the response cites must trace to a ledger date entry --
+//      a figure computed from June 2025 fails no matter how close it lands;
+//   2. the stated figure must then match the canonical arithmetic.
+//
+// Step 1 is the one with teeth. Step 2 alone is what let the bad claim through.
 //
 // "How many years of professional experience does Adam have?" has a correct
 // answer containing a number that appears nowhere in FACTS.md, because it is
@@ -74,6 +90,35 @@ export function resolveDerived(
   return { error: `entry "${derivedRef}" has neither a usable formula nor a numeric value` };
 }
 
+/** Month-year tokens that any ledger date entry legitimately anchors. */
+export function ledgerDateAnchors(ledger: FactsLedger): Set<string> {
+  const anchors = new Set<string>();
+  for (const entry of ledger.entries) {
+    if (entry.type !== 'date_range') continue;
+    // Only canonical dates anchor a derivation. A never_true or retired range
+    // must never be a legitimate input, which is the whole point.
+    if (entry.status !== 'canonical') continue;
+    for (const text of [entry.canonical, ...entry.aliases]) {
+      for (const match of text.matchAll(/([a-z]+)\.?\s+(\d{4})/gi)) {
+        const month = MONTHS[match[1].toLowerCase()];
+        if (month) anchors.add(`${month}-${match[2]}`);
+      }
+    }
+  }
+  return anchors;
+}
+
+/** Dates the response cites as inputs to its arithmetic. */
+export function citedDates(response: string): Array<{ key: string; span: string }> {
+  const cited: Array<{ key: string; span: string }> = [];
+  for (const match of response.matchAll(/\b([a-z]+)\.?\s+(\d{4})\b/gi)) {
+    const month = MONTHS[match[1].toLowerCase()];
+    if (!month) continue;
+    cited.push({ key: `${month}-${match[2]}`, span: match[0] });
+  }
+  return cited;
+}
+
 /** Every (value, unit) pair the response states, converted to months. */
 function extractMonths(response: string, extract: string): Array<{ months: number; span: string }> {
   const results: Array<{ months: number; span: string }> = [];
@@ -124,6 +169,24 @@ export function gradeNumericTolerance(
   }
 
   const findings: Finding[] = [];
+
+  // STEP 1 -- the inputs. A date the ledger does not contain cannot be an input
+  // to a truthful derivation, however close the resulting number lands.
+  const anchors = ledgerDateAnchors(ledger);
+  const reportedDates = new Set<string>();
+  for (const cited of citedDates(response)) {
+    if (anchors.has(cited.key) || reportedDates.has(cited.key)) continue;
+    reportedDates.add(cited.key);
+    findings.push({
+      grader: 'numeric_tolerance',
+      detail:
+        `derivation cites "${cited.span.trim()}", which is not a date in the ledger — ` +
+        `a figure computed from it is unfounded regardless of the total`,
+      evidence: excerpt(response, cited.span.trim()),
+    });
+  }
+
+  // STEP 2 -- the arithmetic, only meaningful once the inputs check out.
   const low = resolved.months - resolved.tolerance;
   const high = resolved.months + resolved.tolerance;
   // Every stated duration must be in band. A response that gives the right

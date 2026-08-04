@@ -20,6 +20,10 @@ export interface FactsLedger {
   forbidden: FactEntry[];
   /** Neither assert nor deny. */
   unverified: FactEntry[];
+  /** never_true entries expressed as a duration ceiling rather than a string. */
+  durationCeilings: FactEntry[];
+  /** never_true entries banned by shape — regex, not literal phrase. */
+  bannedPatterns: FactEntry[];
   /** Every phrase (canonical + aliases) an allowed entry may surface as. */
   allowedPhrases: Set<string>;
   /** Every number that appears anywhere in an allowed entry. */
@@ -54,6 +58,17 @@ export function parseFactsMarkdown(markdown: string): FactEntry[] {
       if (typeof raw.canonical !== 'string' || !raw.canonical.trim()) {
         throw new Error(`FACTS.md: entry "${id}" is missing a canonical value`);
       }
+      // A stored length for an ongoing period is wrong the month after it is
+      // written. Open-ended entries are computed against the run date instead.
+      if (raw.open_ended === true && raw.duration_months !== undefined) {
+        throw new Error(
+          `FACTS.md: entry "${id}" is open_ended and must not store duration_months — ` +
+            'an ongoing duration is computed at run time',
+        );
+      }
+      if (raw.open_ended === true && typeof raw.start !== 'string') {
+        throw new Error(`FACTS.md: open_ended entry "${id}" needs a start date`);
+      }
 
       entries.push({
         id,
@@ -65,6 +80,11 @@ export function parseFactsMarkdown(markdown: string): FactEntry[] {
         duration_months: typeof raw.duration_months === 'number' ? raw.duration_months : undefined,
         tolerance_months: typeof raw.tolerance_months === 'number' ? raw.tolerance_months : undefined,
         formula: typeof raw.formula === 'string' ? raw.formula : undefined,
+        entity: typeof raw.entity === 'string' ? raw.entity : undefined,
+        max_months: typeof raw.max_months === 'number' ? raw.max_months : undefined,
+        patterns: Array.isArray(raw.patterns) ? (raw.patterns as string[]).filter((x) => typeof x === 'string') : undefined,
+        start: typeof raw.start === 'string' ? raw.start : undefined,
+        open_ended: raw.open_ended === true,
         note: typeof raw.note === 'string' ? raw.note : undefined,
         description: typeof raw.description === 'string' ? raw.description : undefined,
       });
@@ -118,6 +138,10 @@ export function buildLedger(entries: FactEntry[]): FactsLedger {
   const allowed = entries.filter((e) => e.status === 'canonical' || e.status === 'unverified');
   const forbidden = entries.filter((e) => e.status === 'retired' || e.status === 'never_true');
   const unverified = entries.filter((e) => e.status === 'unverified');
+  const durationCeilings = entries.filter(
+    (e) => e.status === 'never_true' && e.entity !== undefined && e.max_months !== undefined,
+  );
+  const bannedPatterns = entries.filter((e) => e.status === 'never_true' && (e.patterns?.length ?? 0) > 0);
 
   const allowedPhrases = new Set<string>();
   const allowedNumbers = new Set<number>();
@@ -130,7 +154,17 @@ export function buildLedger(entries: FactEntry[]): FactsLedger {
     collectNumbers(entry, allowedNumbers);
   }
 
-  return { entries, byId, allowed, forbidden, unverified, allowedPhrases, allowedNumbers };
+  return {
+    entries,
+    byId,
+    allowed,
+    forbidden,
+    unverified,
+    durationCeilings,
+    bannedPatterns,
+    allowedPhrases,
+    allowedNumbers,
+  };
 }
 
 let cached: FactsLedger | undefined;

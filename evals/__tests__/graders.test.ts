@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLedger, isLiteralClaim, loadLedger, matchablePhrases, parseFactsMarkdown } from '../src/facts.ts';
 import { containsPhrase, normalize } from '../src/normalize.ts';
 import { gradeAbstention } from '../src/graders/abstention.ts';
+import { gradeDurationCeilings } from '../src/graders/duration.ts';
 import { gradeExactMatch } from '../src/graders/exactMatch.ts';
 import { detectEntities, gradeGrounded } from '../src/graders/grounded.ts';
 import { gradeNumericTolerance, resolveDerived } from '../src/graders/numeric.ts';
@@ -281,9 +282,16 @@ describe('abstention', () => {
 describe('numeric tolerance', () => {
   const now = new Date(2026, 7, 3); // 2026-08-03
 
-  it('sums duration_months across the referenced date ranges', () => {
+  // The ledger deliberately has no blended career total -- that figure is
+  // banned, not computed. What remains is single-anchor elapsed time.
+  it('computes an open-ended period against the run date', () => {
+    const resolved = resolveDerived('derived.independent-months', ledger, now);
+    expect('months' in resolved && resolved.months).toBe(7); // Jan 2026 -> Aug 2026
+  });
+
+  it('refuses to resolve the banned blended total', () => {
     const resolved = resolveDerived('derived.professional-months', ledger, now);
-    expect(resolved).toEqual({ months: 7, tolerance: 2 });
+    expect('error' in resolved).toBe(true);
   });
 
   it('recomputes an elapsed-time formula against the current date', () => {
@@ -292,7 +300,7 @@ describe('numeric tolerance', () => {
   });
 
   const spec = {
-    derived_ref: 'derived.professional-months',
+    derived_ref: 'derived.independent-months',
     unit: 'months' as const,
     extract: '(\\d+(?:\\.\\d+)?)\\s*(years?|yrs?|months?)',
   };
@@ -302,13 +310,13 @@ describe('numeric tolerance', () => {
   });
 
   it('rejects an inflated figure', () => {
-    const result = gradeNumericTolerance('He has about 2 years of experience.', spec, ledger, now);
+    const result = gradeNumericTolerance('About 2 years.', spec, ledger, now);
     expect(result.passed).toBe(false);
     expect(result.findings[0].detail).toMatch(/24 months/);
   });
 
   it('rejects a response that gives a right figure and then a wrong one', () => {
-    const result = gradeNumericTolerance('Roughly 7 months professionally — call it 3 years of building.', spec, ledger, now);
+    const result = gradeNumericTolerance('Roughly 7 months — call it 3 years.', spec, ledger, now);
     expect(result.passed).toBe(false);
   });
 
@@ -392,7 +400,7 @@ describe('case files', () => {
   const cases = loadCases();
 
   it('loads every case with a unique id', () => {
-    expect(cases).toHaveLength(61);
+    expect(cases).toHaveLength(62);
     expect(new Set(cases.map((c) => c.id)).size).toBe(cases.length);
   });
 
@@ -541,5 +549,79 @@ describe('newRegressions', () => {
 
   it('reports nothing when there is no baseline at all', () => {
     expect(newRegressions(report([outcome('a', false)]), undefined)).toEqual([]);
+  });
+});
+
+// The Sigo Signs overclaim. A string denylist catches the literal fabrication
+// and nothing else; every paraphrase says the same false thing.
+describe('duration ceilings', () => {
+  const check = (text: string) => gradeDurationCeilings(text, ledger);
+
+  it('accepts the real tenure', () => {
+    expect(check('Adam was at Sigo Signs for 3 months, Oct to Dec 2025.').passed).toBe(true);
+  });
+
+  it('catches an inflated month count', () => {
+    const r = check('He spent about 8 months at Sigo Signs.');
+    expect(r.passed).toBe(false);
+    expect(r.findings[0].factId).toBe('never.sigo-tenure');
+    expect(r.findings[0].detail).toMatch(/8 months/);
+  });
+
+  // The paraphrases a denylist cannot enumerate.
+  it.each([
+    'He was at Sigo Signs for roughly half a year.',
+    'Sigo Signs was about a year of his career.',
+    'He spent the better part of a year at Sigo Signs.',
+    'Adam worked at Sigo Signs for nearly a year.',
+    'He put in six months at Sigo Signs.',
+    'Sigo Signs: a year and a half.',
+  ])('catches the paraphrase %#', (text) => {
+    expect(check(text).passed, text).toBe(false);
+  });
+
+  // The one that matters most: no duration word appears at all.
+  it('computes the span from a bare date range', () => {
+    const r = check('Adam was at Sigo Signs from June 2025 to January 2026.');
+    expect(r.passed).toBe(false);
+    expect(r.findings[0].detail).toMatch(/computed from the range/);
+  });
+
+  it('catches an en-dashed range through normalization', () => {
+    expect(check('Sigo Signs (Jun 2025 – Jan 2026)').passed).toBe(false);
+  });
+
+  it('does not fire on a duration about something else', () => {
+    expect(check('He has 4 years of Python. Separately, Sigo Signs ran Oct–Dec 2025.').passed).toBe(true);
+  });
+
+  it('does not fire when the employer is never mentioned', () => {
+    expect(check('He spent about 8 months on that project.').passed).toBe(true);
+  });
+});
+
+describe('derived-figure validation', () => {
+  const now = new Date(2026, 7, 4);
+  const spec = {
+    derived_ref: 'derived.independent-months',
+    unit: 'months' as const,
+    extract: '(\\d+(?:\\.\\d+)?)\\s*(years?|yrs?|months?)',
+  };
+
+  it('accepts a figure derived from ledger dates', () => {
+    const r = gradeNumericTolerance('Oct 2025 to Dec 2025 plus Jan 2026 to Apr 2026 — 7 months.', spec, ledger, now);
+    expect(r.passed, JSON.stringify(r.findings)).toBe(true);
+  });
+
+  // The failure the original grader waved through: correct arithmetic, bad input.
+  it('rejects a figure derived from a date that is not in the ledger', () => {
+    const r = gradeNumericTolerance('From June 2025 to January 2026 — 7 months.', spec, ledger, now);
+    expect(r.passed).toBe(false);
+    expect(r.findings[0].detail).toMatch(/not a date in the ledger/);
+  });
+
+  it('names the offending date rather than just failing', () => {
+    const r = gradeNumericTolerance('He started in June 2025, so 7 months.', spec, ledger, now);
+    expect(r.findings[0].detail).toMatch(/June 2025/);
   });
 });

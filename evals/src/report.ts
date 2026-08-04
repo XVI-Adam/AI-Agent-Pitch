@@ -25,10 +25,14 @@ export interface CaseOutcome {
 
 export interface RunReport {
   timestamp: string;
+  /** Hash of SYSTEM_PROMPT + fit prompt shape + FACTS.md. */
+  promptHash?: string;
   model: string;
   judgeModel?: string;
   temperature: number;
   samples: number;
+  /** Judge skipped — layers 1-3 only. */
+  deterministicOnly?: boolean;
   filter?: string;
   consistency: GraderResult;
   outcomes: CaseOutcome[];
@@ -84,12 +88,17 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
   const baselinePassing = new Set((baseline?.outcomes ?? []).filter((o) => o.passed).map((o) => o.id));
   const baselineKnown = new Set((baseline?.outcomes ?? []).map((o) => o.id));
 
-  const regressions = failing.filter((c) => baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
+  const stale = isBaselineStale(report, baseline);
+  const regressions = stale
+    ? []
+    : failing.filter((c) => baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
   const known = failing.filter((c) => c.id in report.expectedFailures);
   const other = failing.filter((c) => !regressions.includes(c) && !known.includes(c));
-  const fixed = [...grouped.keys()].filter(
-    (id) => baselineKnown.has(id) && !baselinePassing.has(id) && grouped.get(id)!.every((s) => s.passed),
-  );
+  const fixed = stale
+    ? []
+    : [...grouped.keys()].filter(
+        (id) => baselineKnown.has(id) && !baselinePassing.has(id) && grouped.get(id)!.every((s) => s.passed),
+      );
 
   const out: string[] = [];
   out.push(`# Ask Adam eval — ${report.timestamp}`);
@@ -99,6 +108,7 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
       `model \`${report.model}\`` +
       (report.judgeModel ? ` · judge \`${report.judgeModel}\`` : '') +
       ` · temperature ${report.temperature}` +
+      (report.deterministicOnly ? ' · deterministic only (judge skipped)' : '') +
       (report.samples > 1 ? ` · ${report.samples} samples/case` : '') +
       (report.filter ? ` · filter \`${report.filter}\`` : ''),
   );
@@ -106,6 +116,13 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
 
   if (!baseline) {
     out.push('> No `evals/baseline.json` yet — nothing to diff against. Promote a run with `npm run eval:baseline`.');
+    out.push('');
+  } else if (stale) {
+    out.push(
+      '> **baseline stale — regression diff suppressed.** The baseline was measured against a ' +
+        `different prompt or ledger (\`${baseline.promptHash ?? 'none'}\` vs \`${report.promptHash}\`). ` +
+        'Every diff against it would be noise. Re-run and `npm run eval:baseline` to re-anchor.',
+    );
     out.push('');
   }
 
@@ -213,16 +230,21 @@ function renderFailure(outcome: CaseOutcome, flaky: boolean, sampleCount: number
 export function renderSummaryTable(report: RunReport, baseline?: RunReport): string {
   const grouped = byCase(report.outcomes);
   const cases = [...grouped.entries()].map(([id, samples]) => ({ id, passed: samples.every((s) => s.passed) }));
+  const stale = isBaselineStale(report, baseline);
   const baselinePassing = new Set((baseline?.outcomes ?? []).filter((o) => o.passed).map((o) => o.id));
-  const regressions = cases.filter((c) => !c.passed && baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
+  const regressions = stale
+    ? []
+    : cases.filter((c) => !c.passed && baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
 
   const passed = cases.filter((c) => c.passed).length;
   const lines = [
     `**Ask Adam evals:** ${passed}/${cases.length} passing (${pct(passed, cases.length)})`,
     '',
-    regressions.length > 0
-      ? `🔴 **${regressions.length} new regression(s):** ${regressions.map((c) => `\`${c.id}\``).join(', ')}`
-      : '✅ No new regressions.',
+    stale
+      ? '⚠️ **baseline stale — regression diff suppressed.** Prompt or ledger changed since the baseline was taken.'
+      : regressions.length > 0
+        ? `🔴 **${regressions.length} new regression(s):** ${regressions.map((c) => `\`${c.id}\``).join(', ')}`
+        : '✅ No new regressions.',
     '',
     '| Category | Pass | Rate |',
     '|---|---|---|',
@@ -246,7 +268,18 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
  * the baseline (newly added) is not one either -- otherwise every new
  * `expect: fail` case would break the build the day it lands.
  */
+/**
+ * A baseline only means something against the prompt it measured. When they
+ * differ, every diff is noise and the honest move is to say so rather than
+ * emit regressions nobody can act on.
+ */
+export function isBaselineStale(report: RunReport, baseline: RunReport | undefined): boolean {
+  if (!baseline) return false;
+  return baseline.promptHash !== report.promptHash;
+}
+
 export function newRegressions(report: RunReport, baseline: RunReport | undefined): string[] {
+  if (isBaselineStale(report, baseline)) return [];
   const grouped = byCase(report.outcomes);
   const baselineGrouped = byCase(baseline?.outcomes ?? []);
 

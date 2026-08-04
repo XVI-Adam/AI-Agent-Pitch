@@ -48,6 +48,22 @@ export function gradeForbidden(response: string, spec: GraderSpec, ledger: Facts
     findings.push(...matchPatterns(response, spec.forbidden, 'forbidden'));
   }
 
+  // Ledger entries banned by SHAPE rather than by literal string
+  // (never.blended-experience-total). Applied whenever the default list is,
+  // because a claim with no correct value is not a per-case concern.
+  if (spec.forbidden === 'default') {
+    for (const entry of ledger.bannedPatterns) {
+      for (const finding of matchPatterns(response, entry.patterns ?? [], 'forbidden')) {
+        findings.push({
+          ...finding,
+          factId: entry.id,
+          detail: `asserted a banned claim shape (${entry.id}): ${entry.canonical}`,
+        });
+        break; // one finding per entry
+      }
+    }
+  }
+
   findings.push(...matchPatterns(response, spec.forbidden_extra ?? [], 'forbidden_extra'));
 
   return { grader: 'forbidden', passed: findings.length === 0, findings };
@@ -165,9 +181,10 @@ function parseMonthYear(text: string): MonthYear | undefined {
  * `must_match_daterange` — the canonical range must be present as a range.
  *
  * Checks both endpoints, which is what catches AVERAGING. A model reconciling a
- * stale record ("Jun 2025 - Jan 2026") with the canonical one ("Oct 2025 - Dec
- * 2025") tends to emit something in between; requiring both endpoints rejects
- * that without needing to enumerate every wrong range.
+ * stale record with the canonical one tends to emit something in between —
+ * given a true range of "Mar 2024 - May 2024" and a bogus "Jan 2024 - Sep 2024"
+ * it will answer "early-to-mid 2024". Requiring both endpoints rejects that
+ * without needing to enumerate every wrong range.
  */
 export function gradeDateRange(response: string, spec: GraderSpec): GraderResult {
   const expected = spec.must_match_daterange;

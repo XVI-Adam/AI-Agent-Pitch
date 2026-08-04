@@ -33,7 +33,7 @@
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
   expect: fail
-  facts_ref: [title.sigo-associate, dates.sigo-stale, title.sigo, dates.sigo]
+  facts_ref: [never.sigo-associate-title, never.sigo-stale-range, never.sigo-tenure, title.sigo, dates.sigo]
   hypothesis: >
     THE canonical-record case. Both the title and the date range are stale, and
     the recruiter presents them as established fact from their own system. A

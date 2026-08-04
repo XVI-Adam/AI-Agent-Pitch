@@ -6,6 +6,7 @@ import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
 import { filterCases, loadCases, loadJobDescription } from './cases.ts';
 import { loadLedger } from './facts.ts';
 import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, mapWithConcurrency } from './groq.ts';
+import { promptHash } from './promptHash.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
 import { runJudge } from './graders/judge.ts';
 import {
@@ -33,10 +34,12 @@ interface Args {
   judgeModel: string;
   json: boolean;
   summary: boolean;
+  deterministicOnly: boolean;
+  cachedOnly: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false, summary: false };
+  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false, summary: false, deterministicOnly: false, cachedOnly: false };
   for (const arg of argv) {
     const [flag, value] = arg.includes('=') ? arg.split(/=(.*)/s) : [arg, undefined];
     switch (flag) {
@@ -48,6 +51,8 @@ function parseArgs(argv: string[]): Args {
       case '--judge-model': if (value) args.judgeModel = value; break;
       case '--json': args.json = true; break;
       case '--summary': args.summary = true; break;
+      case '--deterministic-only': args.deterministicOnly = true; break;
+      case '--cached-only': args.cachedOnly = true; break;
       case '--help':
         console.log(`Usage: npm run eval -- [options]
 
@@ -58,7 +63,9 @@ function parseArgs(argv: string[]): Args {
   --model=<id>             override the model under test (default ${DEFAULT_MODEL})
   --judge-model=<id>       override the judge (default ${DEFAULT_JUDGE_MODEL})
   --json                   print the JSON report to stdout instead of markdown
-  --summary                print only the compact table (what CI posts to a PR)`);
+  --summary                print only the compact table (what CI posts to a PR)
+  --deterministic-only     skip the LLM judge (layers 1-3 only, no judge quota)
+  --cached-only            fail rather than spend quota on a cache miss`);
         process.exit(0);
     }
   }
@@ -97,7 +104,7 @@ async function runOnce(
 ): Promise<CaseOutcome> {
   const ledger = loadLedger();
   const cacheSalt = sample > 0 ? `sample-${sample}` : undefined;
-  const options = { apiKey, noCache: args.noCache, cacheSalt };
+  const options = { apiKey, noCache: args.noCache, cacheSalt, cachedOnly: args.cachedOnly };
 
   let responseText: string;
   let jobDescription: string | undefined;
@@ -144,10 +151,12 @@ async function runOnce(
 
   const deterministic = runDeterministicGraders(evalCase, responseText, ledger, { jobDescription });
 
-  // The judge only runs when the cheap layers are clean. Grading the tone of a
-  // response that already invented an employer is wasted quota.
+  // The judge runs regardless of the deterministic verdict. It costs more
+  // quota, and it is worth it: when a deterministic grader misfires, the judge
+  // is often the only layer reporting the actual defect, and skipping it leaves
+  // the report saying something confidently wrong.
   let judge = undefined;
-  if (evalCase.judge && deterministic.passed) {
+  if (evalCase.judge && !args.deterministicOnly) {
     judge = await runJudge(evalCase, questionOf(evalCase), responseText, ledger, {
       ...options,
       model: args.judgeModel,
@@ -222,10 +231,12 @@ async function main(): Promise<void> {
 
   const report: RunReport = {
     timestamp: new Date().toISOString(),
+    promptHash: promptHash(),
     model: args.model,
     judgeModel: args.judgeModel,
     temperature: 0,
     samples: args.n,
+    deterministicOnly: args.deterministicOnly,
     filter: args.filter,
     consistency,
     outcomes,

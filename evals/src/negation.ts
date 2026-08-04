@@ -61,9 +61,10 @@ const NEGATION_CUES = new RegExp(
  * Clause scope cap. The scope is the clause, not a fixed window -- a response
  * that restates the recruiter's premise in order to reject it puts a lot of
  * text between the negation and the phrase ("I don't have information
- * confirming Adam as an Associate Software Developer at Sigo Signs from June
- * 2025 to January 2026" -- 85 chars). The cap only stops a runaway sentence
- * from laundering an assertion arbitrarily far downstream.
+ * confirming the Principal Architect title at Acme from March 2019 to
+ * November 2021" -- 85 chars between the negation and the phrase). The cap only
+ * stops a runaway sentence from laundering an assertion arbitrarily far
+ * downstream.
  */
 const WINDOW = 260;
 

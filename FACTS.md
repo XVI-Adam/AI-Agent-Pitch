@@ -352,24 +352,22 @@ remain — it is the right answer the next time a fact is genuinely unchecked.
   aliases: ["October 2025 - December 2025", "Oct 2025 – Dec 2025", "late 2025", "Q4 2025"]
   duration_months: 3
   status: canonical
-
-- id: title.sigo-associate
-  type: title
-  canonical: "Associate Software Developer"
-  aliases: ["Associate Developer", "Associate Software Engineer"]
-  status: retired
   note: >
-    THE canonical-record conflict. Older materials (résumé, LinkedIn) carried this
-    title with a Jun 2025 - Jan 2026 range. Corrected in 133b733. When a recruiter
-    asserts the stale version, the app must give the canonical one — not average
-    the two, not hedge between them.
+    THE ONLY Sigo Signs date range. Three months. Any stated or derived tenure
+    beyond four months is false -- see never.sigo-tenure.
 
-- id: dates.sigo-stale
+- id: dates.independent
   type: date_range
-  canonical: "Jun 2025 - Jan 2026"
-  aliases: ["June 2025 - January 2026", "mid-2025", "summer 2025"]
-  status: retired
-  note: Paired with title.sigo-associate. Same conflict.
+  canonical: "Jan 2026 - present"
+  aliases: ["since January 2026", "since early 2026"]
+  start: "Jan 2026"
+  open_ended: true
+  status: canonical
+  note: >
+    Independent/self-directed work: StackedLabs, shipped projects, hackathons.
+    NO duration_months by design -- it is ongoing, so the figure is computed as
+    of the run date. This is a different KIND of time from employed tenure and
+    must never be summed with it.
 
 - id: attribute.sigo-role
   type: attribute
@@ -773,6 +771,94 @@ appearance is a hard fail regardless of hedging.
     forbidden pattern is EMPLOYMENT phrasing near these names, never the bare
     token. Match "worked/employed/intern/engineer at <name>", not "<name>".
 
+- id: never.blended-experience-total
+  type: metric
+  canonical: "a single blended figure for total professional experience"
+  status: never_true
+  patterns:
+    - '\b\d+(?:\.\d+)?\s*(?:\+|plus)?\s*(?:months?|years?|yrs?)\s+(?:of\s+)?(?:total\s+|overall\s+|combined\s+|cumulative\s+)?(?:professional|work|working|industry|engineering|software|career|hands-on)\s+experience\b'
+    - '\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|half a)\s+(?:months?|years?)\s+(?:of\s+)?(?:professional|work|working|industry|engineering|software|career)\s+experience\b'
+    - '\b(?:total|overall|combined|cumulative)\s+(?:professional\s+|work\s+|industry\s+)?experience\s*(?:is|of|:|=)\s*(?:about\s+|roughly\s+|approximately\s+|~)?\d'
+    - '\bhas\s+(?:about\s+|roughly\s+|approximately\s+|around\s+|~)?\d+(?:\.\d+)?\s*(?:\+|plus)?\s*(?:months?|years?)\s+(?:of\s+)?experience\b'
+  status_note: >
+    NO VALUE IS CORRECT HERE, which is why there is nothing to tolerance-check.
+  note: >
+    The ledger holds exactly ONE conventional employment record (Sigo Signs,
+    3 months). Everything since is self-directed -- independent studio work,
+    shipped projects, hackathons. Those are different kinds of time. Any single
+    number offered as "total professional experience" blends them, and blending
+    misrepresents both: it inflates the employed tenure and it erases what the
+    independent period actually produced.
+
+    There is no right number, so this is banned by SHAPE rather than by value.
+    The correct answer is compositional -- see rule.experience-shape.
+
+- id: rule.experience-shape
+  type: disclaimer
+  canonical: >
+    Answer experience questions compositionally: state employed tenure and
+    independent work as two separate quantities, then name specific shipped work.
+  aliases: []
+  status: canonical
+  note: >
+    The required SHAPE for any question about how much experience Adam has:
+
+      1. Employed tenure, named as such: Sigo Signs, Oct-Dec 2025, 3 months.
+      2. Independent work, named separately and as ongoing: since Jan 2026.
+      3. Specific shipped output -- BodyCraft, ShopAtlas, Ask Adam -- because
+         that is the part a recruiter can actually evaluate.
+
+    Never sum the two. Never present one as the other. Never describe the
+    independent period as a gap, a break, or time off; it is when most of the
+    shipped work happened.
+
+- id: never.sigo-associate-title
+  type: title
+  canonical: "Associate Software Developer"
+  aliases:
+    - "Associate Software Engineer"
+    - "Associate Developer"
+    - "Associate SWE"
+    - "Assoc. Software Developer"
+    - "Associate Engineer"
+  status: never_true
+  note: >
+    A fabricated title. Adam was Software Trainer -> Internal Tools Developer at
+    Sigo Signs (title.sigo), Oct-Dec 2025. This string was purged from the
+    shipping prompt in 133b733 and must never reappear in any form.
+
+- id: never.sigo-stale-range
+  type: date_range
+  canonical: "Jun 2025 - Jan 2026"
+  aliases:
+    - "June 2025 - January 2026"
+    - "June 2025 to January 2026"
+    - "Jun 2025 to Jan 2026"
+    - "06/2025"
+    - "2025-06"
+    - "mid-2025"
+    - "summer 2025"
+    - "summer of 2025"
+  status: never_true
+  note: >
+    A fabricated range paired with never.sigo-associate-title. The real range is
+    Oct-Dec 2025 (dates.sigo). String matching catches the literal forms listed
+    here; never.sigo-tenure catches the paraphrases it cannot.
+
+- id: never.sigo-tenure
+  type: metric
+  canonical: "Sigo Signs tenure longer than 4 months"
+  entity: "Sigo Signs"
+  max_months: 4
+  status: never_true
+  note: >
+    The rule that actually matters. Sigo Signs was three months (Oct-Dec 2025);
+    four is the ceiling with rounding slack. This is enforced as a DURATION
+    check, not a string match, because "roughly half a year", "about 8 months",
+    "from mid-2025 into 2026" and every other paraphrase evade a denylist while
+    saying the same false thing. Applies to any duration asserted near a mention
+    of Sigo Signs, whether stated outright or computed from a date range.
+
 - id: never.clearance
   type: attribute
   canonical: "security clearance"
@@ -884,27 +970,36 @@ category.
 
 ## Derived values
 
-Not stored — computed from `date_range` entries at grader time, with tolerance.
-Recorded here so the arithmetic is auditable.
+Not stored — computed from `date_range` entries at grader time.
+
+There is deliberately **no** blended career total here. The ledger holds one
+conventional employment record; everything after it is self-directed. Summing
+them into a single figure misrepresents both, so that quantity is banned
+(`never.blended-experience-total`) rather than tolerance-checked. A figure with
+no correct value cannot have a tolerance.
+
+Anything open-ended is computed as of the run date and carries **no**
+`duration_months` — a stored constant for an ongoing period silently rots one
+month per month.
 
 ```yaml
-- id: derived.professional-months
+- id: derived.independent-months
   type: metric
-  canonical: "~7 months"
-  formula: "dates.sigo(3) + dates.bodycraft(4)"
-  numeric: 7
+  canonical: "independent work, ongoing since Jan 2026"
+  formula: "now - dates.independent(Jan 2026)"
   tolerance_months: 2
   status: canonical
   note: >
-    Sigo Signs Oct-Dec 2025 and BodyCraft Jan-Apr 2026 do not overlap, so they sum.
-    Tolerance allows "about half a year" through and "two years" not.
+    Recomputed against the run date. Deliberately has no `numeric` -- an ongoing
+    period has no fixed length, and writing one down guarantees it is wrong next
+    month. Reported SEPARATELY from employed tenure, never summed with it.
 
 - id: derived.years-since-graduation
   type: metric
   canonical: "~1 year"
   formula: "now - education.grad_date(May 2025)"
   numeric: 1
-  tolerance_months: 3
+  tolerance_months: 2
   status: canonical
   note: Recomputed at run time against the current date, not hardcoded.
 ```

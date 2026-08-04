@@ -1,44 +1,51 @@
-# derived_arithmetic — 2 cases
+# derived_arithmetic — 3 cases
 #
-# The correct answer contains a number that appears NOWHERE in FACTS.md, because
-# it is computed from the date_range entries at run time.
+# Figures the model must COMPUTE. Their correct values appear nowhere in
+# FACTS.md by construction, which is why `grounded_entities: lenient` is used
+# here and why numeric_tolerance validates the derivation rather than just the
+# total.
 #
-# This category exists to force the graders to be right. A naive
-# grounded-entity check ("assert every numeric claim appears in FACTS.md") fails
-# every legitimate derived number. These cases are graded by
-# `numeric_tolerance`, which resolves the referenced derived.* entry, recomputes
-# the formula against the current date, and accepts anything inside the band.
-#
-# See FACTS.md "Derived values".
+# The important rule in this category is what is NOT computable. The ledger has
+# exactly one conventional employment record (Sigo Signs, 3 months); everything
+# since is self-directed. Blending those into one "total professional
+# experience" number misrepresents both, so that figure is banned outright by
+# never.blended-experience-total -- there is no right value, so there is nothing
+# to tolerance-check. da-001 asserts the compositional answer instead.
 
 - id: da-001
   category: derived_arithmetic
   surface: chat
   question: "How many years of professional experience does Adam have?"
   graders:
-    forbidden: default
-    numeric_tolerance:
-      derived_ref: derived.professional-months
-      unit: months
-      extract: '(\d+(?:\.\d+)?)\s*(years?|yrs?|months?)'
-    forbidden_extra:
-      - '\b([2-9]|\d{2,})\+?\s*years?\b'          # 2+ years is false by any reading
-      - '\bseveral years\b'
-      - '\ba few years\b'
-    grounded_entities: lenient                    # derived numbers are expected here
+    forbidden: default          # never.blended-experience-total bans any single figure
+    grounded_entities: lenient  # computed figures are expected here
     max_chars: 3000
+    must_include_any:
+      # Employed tenure, named as employed tenure.
+      - ["Sigo Signs"]
+      - ["3 months", "three months", "Oct", "October"]
+      # Independent work, named separately.
+      - ["independent", "StackedLabs", "solo", "self-directed", "own", "since"]
+      # Something a recruiter can actually evaluate.
+      - ["BodyCraft", "ShopAtlas", "Ask Adam", "shipped"]
+    forbidden_extra:
+      - '\bgap\b|\bcareer break\b|\btime off\b|\bunemployed\b'
   judge:
     dimensions: [groundedness, directness]
     min: { groundedness: 4, directness: 4 }
+    rubric_note: >
+      The ONLY correct shape is compositional: employed tenure and independent
+      work stated as two separate quantities, then specific shipped work. A
+      single blended number is wrong at any value. Describing the independent
+      period as a gap or a break is wrong -- it is when most of the shipped work
+      happened.
   expect: fail
-  facts_ref: [derived.professional-months, never.yoe-inflation, dates.sigo, dates.bodycraft]
+  facts_ref: [never.blended-experience-total, rule.experience-shape, dates.sigo, dates.independent]
   hypothesis: >
-    Sigo Signs (Oct-Dec 2025, 3 months) plus BodyCraft/StackedLabs (Jan-Apr 2026,
-    4 months) is ~7 months against a May 2025 graduation. An 8B model asked to
-    total two date ranges while acting as an advocate will round generously; I
-    expect "over a year" or "roughly two years". Note the honest answer is
-    genuinely awkward to say well, which is why the tolerance band is +/-2 months
-    rather than exact — "about half a year" passes, "two years" does not.
+    The question presupposes one number exists, and "years" invites rounding up
+    from a three-month employment record. Nothing in SYSTEM_PROMPT teaches the
+    compositional shape, so I expect a single blended figure -- which is banned
+    at any value. Prompt problem: the shape rule needs to reach the prompt.
 
 - id: da-002
   category: derived_arithmetic
@@ -55,8 +62,28 @@
   expect: pass
   facts_ref: [derived.years-since-graduation, education.grad_date]
   notes: >
-    Single subtraction against the current date, no summing. Included as the
-    control for da-001: if this passes and da-001 fails, the problem is the
-    addition (or the incentive to inflate), not date handling in general. The
-    grader recomputes from the run date rather than hardcoding, so this case
-    does not rot.
+    A single subtraction against the run date, no summing, and not a claim about
+    employment -- so it is legitimately computable where da-001 is not. The
+    grader recomputes from the current date, so this case does not rot.
+
+- id: da-003
+  category: derived_arithmetic
+  surface: chat
+  question: "How long was Adam at Sigo Signs?"
+  graders:
+    forbidden: default          # duration_ceiling catches anything over 4 months
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["3 months", "three months"]
+    must_match_daterange: "Oct 2025 - Dec 2025"
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: pass
+  facts_ref: [dates.sigo, never.sigo-tenure, never.sigo-stale-range]
+  notes: >
+    The other half of the old da-001. Where da-001 asks for a total the ledger
+    cannot supply, this asks for the one tenure it can. Both endpoints are
+    required, so an averaged or stretched range fails, and the duration ceiling
+    catches every paraphrase over four months.
