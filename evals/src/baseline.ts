@@ -46,6 +46,32 @@ async function main(): Promise<void> {
 
   console.log(`\nPromoting: ${path.split('/').pop()}`);
   console.log(`  ${after.size} passing of ${new Set(report.outcomes.map((o) => o.id)).size} cases`);
+
+  // A run with errored cases is missing results, not reporting failures. Those
+  // cases would simply be absent from the baseline, and absent-from-baseline
+  // means "not a regression" forever after — the exact silent hole this file
+  // exists to prevent. Refuse outright rather than warn.
+  if (report.errors.length > 0) {
+    console.error(
+      `\n  ✖ REFUSING: ${report.errors.length} case(s) errored in this run and produced no result:\n` +
+        report.errors.map((e) => `      ${e.id}: ${e.message.slice(0, 140)}`).join('\n') +
+        '\n\n    A baseline missing those cases can never flag them as regressions.' +
+        '\n    Re-run the suite until every case returns a result, then promote.\n',
+    );
+    process.exit(1);
+  }
+
+  // A baseline without a promptHash is permanently "stale" to every consumer
+  // (the runner suppresses its diff, eval:regrade reports-but-does-not-enforce),
+  // which silently disarms the gate.
+  if (!report.promptHash) {
+    console.error(
+      '\n  ✖ REFUSING: this run has no promptHash. Every consumer would treat the' +
+        '\n    resulting baseline as stale and stop enforcing regressions.' +
+        '\n    Re-run with the current runner, which records it.\n',
+    );
+    process.exit(1);
+  }
   if (current) {
     console.log(`  ${newlyPassing.length} newly passing: ${newlyPassing.join(', ') || '(none)'}`);
     // The dangerous direction — this is what silently lowers the bar.

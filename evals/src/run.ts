@@ -293,10 +293,25 @@ async function main(): Promise<void> {
   else console.log(markdown);
   process.stderr.write(`\nWrote evals/results/${stamp}.json and .md\n`);
 
-  // Exit non-zero only on NEW regressions, so pre-existing known failures
-  // tracked in expected_failures.json don't block every PR.
+  // Two independent reasons to fail.
+  //
+  // Regressions: cases that passed at baseline and fail now, minus anything
+  // tracked in expected_failures.json — pre-existing known failures don't block
+  // every PR.
+  //
+  // Errors: a case that threw produced NO outcome, so it is invisible to the
+  // regression diff — a run where 12 cases died on a rate-limit deadline would
+  // otherwise report "50/50 passing" and exit 0. An incomplete run cannot
+  // certify anything, so it fails on its own.
   const regressions = newRegressions(report, baseline);
-  process.exit(regressions.length > 0 ? 1 : 0);
+  if (report.errors.length > 0) {
+    process.stderr.write(
+      `\n${report.errors.length} case(s) errored and produced no result — this run is INCOMPLETE:\n` +
+        report.errors.map((e) => `  - ${e.id}: ${e.message.slice(0, 160)}`).join('\n') +
+        '\n',
+    );
+  }
+  process.exit(regressions.length > 0 || report.errors.length > 0 ? 1 : 0);
 }
 
 main().catch((err) => {

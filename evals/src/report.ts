@@ -126,6 +126,17 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
     out.push('');
   }
 
+  // Errored cases produce no outcome, so every count and rate below silently
+  // excludes them. Say so above the numbers, not in a footnote under them.
+  if (report.errors.length > 0) {
+    out.push(`## ⚠️ INCOMPLETE — ${report.errors.length} case(s) errored`);
+    out.push('');
+    out.push('These produced no result and are **not** included in any count or rate below.');
+    out.push('');
+    for (const error of report.errors) out.push(`- \`${error.id}\` — ${error.message}`);
+    out.push('');
+  }
+
   // Regressions first and unmissable: this is the number that should block a PR.
   if (regressions.length > 0) {
     out.push(`## 🔴 ${regressions.length} NEW REGRESSION${regressions.length === 1 ? '' : 'S'}`);
@@ -246,9 +257,20 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
         ? `🔴 **${regressions.length} new regression(s):** ${regressions.map((c) => `\`${c.id}\``).join(', ')}`
         : '✅ No new regressions.',
     '',
-    '| Category | Pass | Rate |',
-    '|---|---|---|',
   ];
+
+  // An errored case has no outcome, so it is absent from the counts above.
+  // Saying "50/50 passing" while 12 cases never ran is the failure mode this
+  // line exists to prevent — state it where nobody can miss it.
+  if (report.errors.length > 0) {
+    lines.push(
+      `⚠️ **Incomplete run — ${report.errors.length} case(s) errored and are NOT counted above:** ` +
+        report.errors.map((e) => `\`${e.id}\``).join(', '),
+      '',
+    );
+  }
+
+  lines.push('| Category | Pass | Rate |', '|---|---|---|');
 
   const outcomeById = new Map(report.outcomes.map((o) => [o.id, o]));
   const categories = [...new Set(report.outcomes.map((o) => o.category))].sort();

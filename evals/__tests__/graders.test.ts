@@ -18,7 +18,7 @@ import {
 } from '../src/graders/forbidden.ts';
 import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema.ts';
 import { loadCases, filterCases } from '../src/cases.ts';
-import { newRegressions, type CaseOutcome, type RunReport } from '../src/report.ts';
+import { newRegressions, renderSummaryTable, type CaseOutcome, type RunReport } from '../src/report.ts';
 import { firstAssertion, isNegatedMention } from '../src/negation.ts';
 import type { FitReport } from '../../src/types/fit.ts';
 
@@ -549,6 +549,26 @@ describe('newRegressions', () => {
 
   it('reports nothing when there is no baseline at all', () => {
     expect(newRegressions(report([outcome('a', false)]), undefined)).toEqual([]);
+  });
+
+  // An errored case yields no CaseOutcome at all, so it cannot appear in the
+  // regression diff — every count in the report silently excludes it. The
+  // runner fails the run on report.errors separately; the summary has to SAY
+  // so, or CI posts "2/2 passing" for a run where a third of the suite died on
+  // a rate-limit deadline.
+  it('summary marks a run incomplete when cases errored', () => {
+    const current = report([outcome('a', true), outcome('b', true)]);
+    current.errors = [{ id: 'c', message: 'Groq call exceeded its 10min deadline' }];
+    const summary = renderSummaryTable(current, report([outcome('a', true), outcome('b', true)]));
+    expect(summary).toMatch(/Incomplete run/);
+    expect(summary).toMatch(/`c`/);
+    // The errored case is invisible to the regression diff — hence the banner.
+    expect(newRegressions(current, report([outcome('a', true), outcome('c', true)]))).toEqual([]);
+  });
+
+  it('summary says nothing about completeness when no case errored', () => {
+    const summary = renderSummaryTable(report([outcome('a', true)]), report([outcome('a', true)]));
+    expect(summary).not.toMatch(/Incomplete/);
   });
 });
 
