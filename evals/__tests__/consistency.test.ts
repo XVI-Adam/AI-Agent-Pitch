@@ -121,6 +121,19 @@ describe('app/harness boundary', () => {
     expect(imports).toEqual([]);
   });
 
+  // The eval runner executes api/_lib/*.ts directly under Node type-stripping,
+  // which requires relative specifiers to carry their literal `.ts` extension.
+  // Vercel's edge builder transpiles those files to `.js` but leaves specifiers
+  // untouched, so a `.ts` specifier survives into the bundle and the DEPLOY
+  // (not `vercel build`, which passes) fails with "unsupported modules".
+  // `rewriteRelativeImportExtensions` is what reconciles the two runtimes; if it
+  // is dropped, nothing else fails until the next deploy. Deep check after any
+  // vercel build: scripts/check-edge-bundle.mjs.
+  it('api/tsconfig.json keeps rewriteRelativeImportExtensions for edge deploys', () => {
+    // Text match, not JSON.parse — tsconfig is JSONC (comments).
+    expect(read('../../api/tsconfig.json')).toMatch(/"rewriteRelativeImportExtensions":\s*true/);
+  });
+
   it('context.ts exports only constants', () => {
     const source = read('../../src/data/context.ts');
     const exports = (source.match(/^export\s+\S+\s+\S+/gm) ?? []).map((line) => line.trim());
