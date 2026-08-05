@@ -310,8 +310,19 @@ npm run eval:baseline                     # promote latest run to baseline
 npm run eval:regrade                      # deterministic graders vs. baseline.json — no key, no quota
 ```
 
-`npm run eval` exits **non-zero only on new regressions** — never on failures
-already tracked in `expected_failures.json`. That is what CI keys on.
+`npm run eval` exits **non-zero on new regressions or on any errored case** —
+never on failures already tracked in `expected_failures.json`. That is what CI
+keys on. An errored case produces no result, so a run containing one cannot
+certify anything and fails on its own.
+
+> **The regression gate is currently REPORT-ONLY.** `baseline.json` predates the
+> three fact corrections on this branch and carries no `promptHash`, so every
+> consumer correctly treats it as stale: failures are reported, not enforced.
+> It stays that way until a full judged run is promoted with
+> `npm run eval:baseline` — which needs a fresh daily judge budget (see the TPD
+> note below). Do **not** hand-edit a `promptHash` into the file to silence the
+> banner; that would arm the gate against responses measured under a different
+> prompt and manufacture phantom regressions.
 
 `npm run eval:baseline` shows what promoting would change before asking, and
 warns loudly when a currently-failing case would become the new normal.
