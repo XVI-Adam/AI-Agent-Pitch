@@ -304,7 +304,10 @@ npm run eval -- --filter=lq-001,mi-003    # specific cases
 npm run eval -- --n=3                     # repeat each case, report variance
 npm run eval -- --no-cache                # ignore the cache, re-spend quota
 npm run eval -- --concurrency=1           # slower, gentler on the rate limit
+npm run eval -- --deterministic-only      # layers 1-3 only, no judge quota
+npm run eval -- --summary                 # compact table (what CI posts)
 npm run eval:baseline                     # promote latest run to baseline
+npm run eval:regrade                      # deterministic graders vs. baseline.json — no key, no quota
 ```
 
 `npm run eval` exits **non-zero only on new regressions** — never on failures
@@ -338,8 +341,28 @@ non-rate-limit 4xx is a bad request, and retrying just burns what's left. One
 case exhausting its retries does not abort the run; it comes back as a named
 error in the report.
 
-**Judge ordering.** Layer 4 runs only when layers 1–3 are clean. Spending a
-judge call on the tone of a response that already invented an employer is waste.
+**Every wait is bounded and visible.** A run must be able to go slow; it must
+never be able to hang silently. Requests time out at 120s; a server-supplied
+`retry-after` is honored but clamped to 120s (Groq's per-day limit can ask for
+*hours*, which is a failed case, not a nap); each call gets 10 minutes of
+retries total before it fails that one case and the run moves on. Progress
+streams to stderr — one timestamped line per case, one per retry — and each
+finished case is appended to `evals/results/<stamp>.progress.jsonl` as it
+lands, so `tail -f` distinguishes a slow run from a dead one. Piping stdout
+through `tail`/`tee` tells you nothing until exit; stderr is the live channel.
+
+**The judge always runs.** An earlier version skipped layer 4 whenever a
+deterministic grader failed. That saved quota and produced misleading reports:
+when the deterministic finding was itself wrong, the judge was the only layer
+that would have named the real defect, and it never ran. Every layer reports,
+every failure shows in full.
+
+**CI runs the cheap half on every PR.** `evals.yml` splits by cost: PRs get
+grader unit tests, typecheck, and `eval:regrade` (deterministic graders re-run
+against the responses stored in `baseline.json` — no key, no quota, seconds).
+The judged suite runs nightly, on `workflow_dispatch`, or when a PR carries the
+`full-eval` label — and a missing `GROQ_API_KEY` skips it rather than failing,
+so forks don't see a red X they cannot fix.
 
 ---
 

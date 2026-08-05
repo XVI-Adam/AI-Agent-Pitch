@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "bench": "node scripts/benchmark.mjs",
     "eval": "node evals/src/run.ts",
-    "eval:baseline": "node evals/src/baseline.ts"
+    "eval:baseline": "node evals/src/baseline.ts",
+    "eval:regrade": "node evals/src/regrade.ts"
   },
   "dependencies": {
     "react": "^19.2.5",

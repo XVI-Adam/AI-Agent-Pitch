@@ -54,6 +54,14 @@ jobs:
       - name: Type check
         run: npx tsc -b
 
+      # Deterministic graders against the STORED responses in baseline.json —
+      # no key, no quota, seconds. Catches grader changes that flip verdicts on
+      # known responses and ledger edits that contradict previously-fine ones.
+      # Reports-but-passes when the baseline is stale (prompt/ledger changed);
+      # the judged suite plus `npm run eval:baseline` re-anchor it.
+      - name: Regrade baseline responses
+        run: npm run eval:regrade
+
   # The judged suite. Nightly, or on demand, never as a blocking PR gate.
   judged:
     name: Full judged suite
