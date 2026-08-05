@@ -98,6 +98,35 @@ function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
   return 750 + Math.random() * ceiling;
 }
 
+/**
+ * Condenses a Groq error body to the part worth reading in a log line.
+ *
+ * Groq's rate-limit messages put the boilerplate first ("Rate limit reached for
+ * model X in organization org_01krh...") and the diagnosis LAST — which limit
+ * was hit, how much is left, and when it resets. Truncating the front keeps the
+ * noise and drops the signal: an entire run's worth of retry lines can look
+ * identical whether the cause is a per-minute window that clears in seconds or
+ * a per-DAY cap that will not clear before the run ends. Keep the tail.
+ */
+export function summarizeError(body: string): string {
+  let message = body;
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    if (typeof parsed.error?.message === 'string') message = parsed.error.message;
+  } catch {
+    // Not JSON — fall through and treat the raw body as the message.
+  }
+  message = message.replace(/\s+/g, ' ').trim();
+
+  // The limit clause ("... on tokens per day (TPD): Limit 100000, Used 99416
+  // ... Please try again in 42m31s") is the whole point of the line.
+  const limit = /\b(?:on )?(tokens?|requests?) per (day|minute|hour)\b[^.]*\.?/i.exec(message);
+  const again = /Please try again in [0-9hms.]+/i.exec(message);
+  if (limit) return [limit[0], again?.[0]].filter(Boolean).join(' ').slice(0, 220);
+
+  return message.length > 220 ? `${message.slice(0, 200)}…` : message;
+}
+
 // Transport guard rails. A 6,000 TPM free tier makes waiting normal; these
 // exist so waiting is bounded, visible, and charged to one case instead of the
 // whole run.
@@ -203,7 +232,7 @@ export async function complete(params: CompletionParams, options: CompleteOption
     // bug in the request and retrying just burns the remaining quota.
     const retryable = response.status === 429 || response.status >= 500;
     const body = await response.text().catch(() => '');
-    lastReason = `HTTP ${response.status}: ${body.slice(0, 200)}`;
+    lastReason = `HTTP ${response.status}: ${summarizeError(body)}`;
     if (!retryable) throw new Error(`Groq request failed, not retryable — ${lastReason}`);
 
     const retryAfter = Number(response.headers.get('retry-after'));

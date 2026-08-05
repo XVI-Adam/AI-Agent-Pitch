@@ -19,6 +19,7 @@ import {
 import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema.ts';
 import { loadCases, filterCases } from '../src/cases.ts';
 import { newRegressions, renderSummaryTable, type CaseOutcome, type RunReport } from '../src/report.ts';
+import { summarizeError } from '../src/groq.ts';
 import { firstAssertion, isNegatedMention } from '../src/negation.ts';
 import type { FitReport } from '../../src/types/fit.ts';
 
@@ -569,6 +570,38 @@ describe('newRegressions', () => {
   it('summary says nothing about completeness when no case errored', () => {
     const summary = renderSummaryTable(report([outcome('a', true)]), report([outcome('a', true)]));
     expect(summary).not.toMatch(/Incomplete/);
+  });
+});
+
+// A retry line whose useful half was truncated away is why a six-hour wedge
+// and a normal rate-limited run looked identical in the log.
+describe('summarizeError', () => {
+  const tpd =
+    '{"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01krh4bs3ae4ds4c2rq71h4q78` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99416, Requested 3537. Please try again in 42m31.392s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}';
+
+  it('keeps the limit type and the reset time, not the org boilerplate', () => {
+    const summary = summarizeError(tpd);
+    expect(summary).toMatch(/tokens per day/);
+    expect(summary).toMatch(/Limit 100000/);
+    expect(summary).toMatch(/try again in 42m31/);
+    // The part that used to fill the whole truncated line.
+    expect(summary).not.toMatch(/org_01krh/);
+  });
+
+  // Per-minute clears on its own; per-day will not clear before the run ends.
+  // Telling them apart is the entire diagnostic value of the line.
+  it('distinguishes a per-minute limit from a per-day one', () => {
+    const tpm = tpd.replace('tokens per day (TPD): Limit 100000', 'tokens per minute (TPM): Limit 12000');
+    expect(summarizeError(tpm)).toMatch(/tokens per minute/);
+    expect(summarizeError(tpm)).not.toMatch(/per day/);
+  });
+
+  it('passes through a non-JSON body without inventing structure', () => {
+    expect(summarizeError('upstream connect error')).toBe('upstream connect error');
+  });
+
+  it('bounds the length of an unrecognized message', () => {
+    expect(summarizeError('x'.repeat(500)).length).toBeLessThanOrEqual(220);
   });
 });
 

@@ -114,8 +114,11 @@ async function runOnce(
     // Waiting out a rate limit is normal here; waiting SILENTLY is what made a
     // wedged run and a healthy one indistinguishable for six hours.
     onRetry: ({ attempt, delayMs, reason }: { attempt: number; delayMs: number; reason: string }) => {
+      // groq.ts already condenses the reason to the diagnostic clause; do not
+      // re-truncate it here, or the limit type and reset time get cut off and
+      // every retry line looks the same.
       process.stderr.write(
-        `[${timestamp()}]   ${evalCase.id}: retry ${attempt} in ${Math.round(delayMs / 1000)}s — ${reason.slice(0, 140)}\n`,
+        `[${timestamp()}]   ${evalCase.id}: retry ${attempt} in ${Math.round(delayMs / 1000)}s — ${reason}\n`,
       );
     },
   };

@@ -13,7 +13,8 @@
     "bench": "node scripts/benchmark.mjs",
     "eval": "node evals/src/run.ts",
     "eval:baseline": "node evals/src/baseline.ts",
-    "eval:regrade": "node evals/src/regrade.ts"
+    "eval:regrade": "node evals/src/regrade.ts",
+    "eval:cost": "node evals/src/cost.ts"
   },
   "dependencies": {
     "react": "^19.2.5",
