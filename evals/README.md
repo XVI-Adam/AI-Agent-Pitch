@@ -341,6 +341,23 @@ non-rate-limit 4xx is a bad request, and retrying just burns what's left. One
 case exhausting its retries does not abort the run; it comes back as a named
 error in the report.
 
+**The daily judge budget is the real ceiling — plan around it.** The limit that
+decides whether a run can finish is not the 6,000 TPM on the model under test
+(those 429s clear in 6–25s). It is the **100,000 tokens-per-day** cap on the
+70B judge. 31 of the 62 cases carry a judge spec and a judge call costs ~2,800
+tokens, so a cold full run needs ~86,000 — roughly **one judged run per day,
+with no room to repeat**. Removing the deterministic short-circuit is what put
+every case in front of the judge and made this reachable.
+
+```bash
+npm run eval:cost          # price a run before starting it
+```
+
+Consequences worth knowing: the response cache is what makes a run resumable,
+so never pass `--no-cache` casually; and a run that dies on the daily cap
+leaves errored cases, which now fail the run and are refused by
+`eval:baseline` (an incomplete baseline can never flag those cases again).
+
 **Every wait is bounded and visible.** A run must be able to go slow; it must
 never be able to hang silently. Requests time out at 120s; a server-supplied
 `retry-after` is honored but clamped to 120s (Groq's per-day limit can ask for
