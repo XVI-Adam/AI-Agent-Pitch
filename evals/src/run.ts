@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT } from '../../src/data/context.ts';
@@ -96,6 +96,8 @@ function questionOf(evalCase: EvalCase): string {
   return `[JD] ${evalCase.jd_file}`;
 }
 
+const timestamp = () => new Date().toISOString().slice(11, 19);
+
 async function runOnce(
   evalCase: EvalCase,
   args: Args,
@@ -104,7 +106,19 @@ async function runOnce(
 ): Promise<CaseOutcome> {
   const ledger = loadLedger();
   const cacheSalt = sample > 0 ? `sample-${sample}` : undefined;
-  const options = { apiKey, noCache: args.noCache, cacheSalt, cachedOnly: args.cachedOnly };
+  const options = {
+    apiKey,
+    noCache: args.noCache,
+    cacheSalt,
+    cachedOnly: args.cachedOnly,
+    // Waiting out a rate limit is normal here; waiting SILENTLY is what made a
+    // wedged run and a healthy one indistinguishable for six hours.
+    onRetry: ({ attempt, delayMs, reason }: { attempt: number; delayMs: number; reason: string }) => {
+      process.stderr.write(
+        `[${timestamp()}]   ${evalCase.id}: retry ${attempt} in ${Math.round(delayMs / 1000)}s — ${reason.slice(0, 140)}\n`,
+      );
+    },
+  };
 
   let responseText: string;
   let jobDescription: string | undefined;
@@ -206,14 +220,34 @@ async function main(): Promise<void> {
   const jobs = selected.flatMap((c) => Array.from({ length: args.n }, (_, sample) => ({ evalCase: c, sample })));
   process.stderr.write(`Running ${selected.length} case(s)${args.n > 1 ? ` x${args.n}` : ''} at concurrency ${args.concurrency}...\n`);
 
+  // Incremental sink: one JSON line per finished case, flushed as it happens.
+  // `tail -f` this to tell a slow run from a dead one — the final report is
+  // still assembled at the end, but is no longer the only evidence of progress.
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  const runStamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const progressPath = join(RESULTS_DIR, `${runStamp}.progress.jsonl`);
+
   let done = 0;
   const settled = await mapWithConcurrency(jobs, args.concurrency, async (job) => {
-    const outcome = await runOnce(job.evalCase, args, apiKey, job.sample);
+    let outcome: CaseOutcome;
+    try {
+      outcome = await runOnce(job.evalCase, args, apiKey, job.sample);
+    } catch (err) {
+      done++;
+      process.stderr.write(
+        `[${timestamp()}] ${String(done).padStart(3)}/${jobs.length}  ERROR ${job.evalCase.id} — ${(err as Error).message.slice(0, 200)}\n`,
+      );
+      appendFileSync(progressPath, JSON.stringify({ id: job.evalCase.id, error: (err as Error).message }) + '\n');
+      throw err; // mapWithConcurrency records it; the run keeps its other results
+    }
     done++;
-    process.stderr.write(`\r  ${done}/${jobs.length}  ${outcome.passed ? 'PASS' : 'FAIL'} ${outcome.id}          `);
+    process.stderr.write(
+      `[${timestamp()}] ${String(done).padStart(3)}/${jobs.length}  ${outcome.passed ? 'PASS' : 'FAIL'} ${outcome.id}` +
+        `${outcome.cached ? ' (cached)' : ` (${(outcome.latencyMs / 1000).toFixed(1)}s${outcome.retries ? `, ${outcome.retries} retries` : ''})`}\n`,
+    );
+    appendFileSync(progressPath, JSON.stringify(outcome) + '\n');
     return outcome;
   });
-  process.stderr.write('\n');
 
   const outcomes: CaseOutcome[] = [];
   const errors: Array<{ id: string; message: string }> = [];
@@ -244,8 +278,8 @@ async function main(): Promise<void> {
     expectedFailures,
   };
 
-  mkdirSync(RESULTS_DIR, { recursive: true });
-  const stamp = report.timestamp.replace(/[:.]/g, '-');
+  // Same stamp as the .progress.jsonl so one run's files sort together.
+  const stamp = runStamp;
   writeFileSync(join(RESULTS_DIR, `${stamp}.json`), JSON.stringify(report, null, 2));
 
   const markdown = renderMarkdown(report, baseline);

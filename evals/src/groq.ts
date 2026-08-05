@@ -82,13 +82,28 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * caused it. Full jitter spreads them across the whole window.
  */
 function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
-  if (retryAfterSeconds !== undefined) return retryAfterSeconds * 1000 + Math.random() * 500;
+  if (retryAfterSeconds !== undefined) {
+    // Clamp what the server asks for. Groq's per-MINUTE limit asks for seconds,
+    // but its per-DAY limit can ask for hours — and sleeping hours inside one
+    // case is how a run wedges silently instead of failing loudly. Anything the
+    // clamp cuts off is quota that will not recover within this run anyway;
+    // the per-call deadline below turns it into a failed case with the server's
+    // stated wait in the message.
+    return Math.min(retryAfterSeconds * 1000, MAX_RETRY_AFTER_MS) + Math.random() * 500;
+  }
   // Floor as well as ceiling: with pure full jitter, early attempts can draw
   // a near-zero delay and burn a retry against a TPM window that resets on a
   // 60s boundary. The floor makes each attempt actually worth spending.
   const ceiling = Math.min(1000 * 2 ** attempt, 45_000);
   return 750 + Math.random() * ceiling;
 }
+
+// Transport guard rails. A 6,000 TPM free tier makes waiting normal; these
+// exist so waiting is bounded, visible, and charged to one case instead of the
+// whole run.
+const REQUEST_TIMEOUT_MS = 120_000; // one hung socket must not stop the suite
+const MAX_RETRY_AFTER_MS = 120_000; // longest single wait we honor from retry-after
+const CALL_DEADLINE_MS = 10 * 60_000; // retries + waits per call; then the case fails
 
 export interface CompleteOptions {
   apiKey: string;
@@ -117,7 +132,20 @@ export async function complete(params: CompletionParams, options: CompleteOption
   }
 
   const maxRetries = options.maxRetries ?? 10;
+  const callStarted = Date.now();
   let lastReason = 'unknown';
+
+  // Retrying is only worth it while the deadline leaves room to actually wait.
+  // Failing one case keeps the other 60 results; blocking the run keeps none.
+  const retryOrGiveUp = async (attempt: number, delay: number): Promise<void> => {
+    if (Date.now() - callStarted + delay > CALL_DEADLINE_MS) {
+      throw new Error(
+        `Groq call exceeded its ${CALL_DEADLINE_MS / 60_000}min deadline after ${attempt} attempt(s) — ${lastReason}`,
+      );
+    }
+    options.onRetry?.({ attempt: attempt + 1, delayMs: delay, reason: lastReason });
+    await sleep(delay);
+  };
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const started = Date.now();
@@ -127,24 +155,36 @@ export async function complete(params: CompletionParams, options: CompleteOption
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${options.apiKey}` },
         body: JSON.stringify(params),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
-      lastReason = `network: ${(err as Error).message}`;
-      const delay = backoffDelay(attempt);
-      options.onRetry?.({ attempt: attempt + 1, delayMs: delay, reason: lastReason });
-      await sleep(delay);
+      const timedOut = (err as Error).name === 'TimeoutError';
+      lastReason = timedOut
+        ? `request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`
+        : `network: ${(err as Error).message}`;
+      await retryOrGiveUp(attempt, backoffDelay(attempt));
       continue;
     }
 
     if (response.ok) {
-      const data = (await response.json()) as {
+      interface CompletionBody {
         choices?: Array<{ message?: { content?: string } }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
-      };
+      }
+      let data: CompletionBody;
+      try {
+        // The timeout signal also governs the body read: a socket that dies
+        // mid-body aborts here rather than hanging.
+        data = (await response.json()) as CompletionBody;
+      } catch (err) {
+        lastReason = `body read failed: ${(err as Error).message}`;
+        await retryOrGiveUp(attempt, backoffDelay(attempt));
+        continue;
+      }
       const text = data.choices?.[0]?.message?.content;
       if (typeof text !== 'string') {
         lastReason = 'response had no message content';
-        await sleep(backoffDelay(attempt));
+        await retryOrGiveUp(attempt, backoffDelay(attempt));
         continue;
       }
       const result: CompletionResult = {
@@ -168,8 +208,7 @@ export async function complete(params: CompletionParams, options: CompleteOption
 
     const retryAfter = Number(response.headers.get('retry-after'));
     const delay = backoffDelay(attempt, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);
-    options.onRetry?.({ attempt: attempt + 1, delayMs: delay, reason: lastReason });
-    await sleep(delay);
+    await retryOrGiveUp(attempt, delay);
   }
 
   throw new Error(`Groq request failed after ${maxRetries} retries — ${lastReason}`);
