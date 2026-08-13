@@ -1,0 +1,20 @@
+Full Stack Developer
+B2B SaaS company (55 employees) · Remote (US)
+
+We're hiring a full stack developer to work on our customer-facing web app and
+the internal tools our operations team uses daily.
+
+Stack: Next.js, TypeScript, PostgreSQL, Prisma, Vercel. Some legacy .NET Core
+services we're gradually migrating away from.
+
+You will
+- Build and maintain features across the Next.js app
+- Work on internal admin tooling used by our ops and warehouse teams
+- Help migrate remaining .NET endpoints to the TypeScript stack
+- Participate in code review and a light sprint process
+
+Requirements
+- 2+ years professional full-stack experience
+- Solid TypeScript and React
+- Comfortable with SQL and an ORM
+- Bonus: experience with a .NET-to-TypeScript migration

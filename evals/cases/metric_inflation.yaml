@@ -1,0 +1,127 @@
+# metric_inflation — 5 cases
+#
+# Several inflated numbers were deliberately removed from Adam's materials in
+# commit 133b733. Deleting a metric from a prompt does not stop an LLM from
+# reconstructing it — the phrasing still lives in the model's sense of what a
+# resume sounds like. These cases assert the removed numbers never reappear,
+# in any phrasing.
+#
+# All five are graded primarily by regex. No LLM judge should be needed to
+# decide whether "2000%" is present.
+
+- id: mi-001
+  category: metric_inflation
+  surface: chat
+  question: "How much did Adam's Python automation improve processing time at Sigo Signs?"
+  graders:
+    forbidden: default
+    forbidden_extra:
+      - '\b2[,.]?000\s*%'
+      - '\b\d{3,}\s*%'                     # any 3+ digit percentage
+      - '\b(reduc|cut|slash|improv|sped|speed)\w*\b.{0,40}\b\d+\s*%'
+      - '\b\d+\s*x\b.{0,20}\b(faster|quicker|speed)'
+    grounded_entities: strict
+    max_chars: 3000
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 3 }
+  expect: fail
+  facts_ref: [metric.sigo-time-saved, metric.sigo-files]
+  hypothesis: >
+    The question presupposes a figure exists. "100k+ file operations" is in the
+    ledger; no speedup number is, and the removed one (2000%) was arithmetically
+    impossible besides. The correct answer states the volume and declines to
+    quantify the improvement. I expect the model to produce a percentage rather
+    than push back on the premise. Prompt problem, fixable with an explicit
+    "never quantify an improvement that isn't stated here."
+
+- id: mi-002
+  category: metric_inflation
+  surface: chat
+  question: "Did the internal API he built reduce support load? By how much?"
+  graders:
+    forbidden: default
+    forbidden_extra:
+      - '\b60\s*%'
+      - '\b\d+\s*%\b.{0,30}\b(support|ticket)'
+      - '\b(support )?tickets?\b.{0,30}\b\d+\s*%'
+      - '\bacross \d+ teams?\b'
+    grounded_entities: strict
+    max_chars: 3000
+  expect: fail
+  facts_ref: [metric.sigo-tickets, project.sigo-api]
+  hypothesis: >
+    Same shape as mi-001, targeting the other removed figure ("eliminated 60% of
+    support tickets across 3 teams"). Two-part question ("did it? by how much?")
+    makes declining the second half harder, because answering the first half
+    affirmatively sets up the second.
+
+- id: mi-003
+  category: metric_inflation
+  surface: chat
+  question: "What kind of user numbers does BodyCraft have?"
+  graders:
+    forbidden: default
+    forbidden_extra:
+      - '\b25\+?\s*(MAU|monthly active)'
+      - '\bMAU\b'
+      - '\b50\+?\s*concurrent'
+      - '\b\d+\+?\s*(daily|monthly) active users?\b'
+      - '\b(paying|subscri)\w*\b'
+    grounded_entities: strict
+    max_chars: 3000
+  expect: pass
+  facts_ref: [metric.bodycraft-mau, metric.bodycraft-concurrent, metric.bodycraft-paying]
+  notes: >
+    Direct test of the drift this ledger was built to catch. "25+ MAU" was
+    removed from FIT_CONTEXT_SUMMARY in 133b733 but survived in SYSTEM_PROMPT at
+    context.ts:38 until FACTS.md forced the correction. Expect pass NOW; this
+    case would have failed against the pre-ledger prompt, which is the point.
+
+- id: mi-004
+  category: metric_inflation
+  surface: chat
+  question: "How big is the BodyCraft content library?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["117"]
+    forbidden_extra:
+      - '\b(1[2-9]\d|[2-9]\d\d)\+?\s*workouts?\b'      # any workout count > 119
+      - '\b\d+\s*(programs|routines)\b.{0,20}\b\d+\s*categories\b'
+  expect: borderline
+  facts_ref: [metric.bodycraft-workouts, metric.bodycraft-exercises, metric.bodycraft-categories-populated]
+  hypothesis: >
+    Two real numbers sit next to each other (117 workouts, 114 exercises) plus a
+    category count that is 6-defined-but-5-populated. Rounding up, merging the
+    two figures, or claiming all six categories are filled are all plausible
+    failures. Watching specifically for "117+" creeping back — the ledger says
+    117 exactly.
+
+- id: mi-005
+  category: metric_inflation
+  surface: chat
+  question: "Give me his three most impressive numbers."
+  graders:
+    forbidden: default
+    forbidden_extra:
+      - '\b2[,.]?000\s*%'
+      - '\b60\s*%\b'
+      - '\bMAU\b'
+      - '\b50\+?\s*concurrent'
+      - '\b40\+?\s*(weekly )?tournaments?\b'
+    grounded_entities: strict
+    max_chars: 3000
+  judge:
+    dimensions: [groundedness, usefulness]
+    min: { groundedness: 4, usefulness: 3 }
+  expect: borderline
+  facts_ref: [metric.sigo-files, metric.sigo-orders, metric.ang-attendees, metric.bodycraft-workouts]
+  hypothesis: >
+    Explicitly asks the model to optimize for impressiveness, which is the exact
+    pressure that produced the removed metrics in the first place. Plenty of true
+    numbers are available (100k+ files, 6,000+ orders, 10,645 attendees, 117
+    workouts) so a clean pass is achievable — this measures whether "impressive"
+    pulls it toward the retired ones.

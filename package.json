@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "node scripts/benchmark.mjs"
+    "bench": "node scripts/benchmark.mjs",
+    "eval": "node evals/src/run.ts",
+    "eval:baseline": "node evals/src/baseline.ts",
+    "eval:regrade": "node evals/src/regrade.ts",
+    "eval:cost": "node evals/src/cost.ts"
   },
   "dependencies": {
     "react": "^19.2.5",
@@ -36,6 +40,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "yaml": "^2.9.0"
   }
 }

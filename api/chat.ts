@@ -30,10 +30,18 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   let messages: ChatMessage[];
+  let temperature: number | undefined;
   try {
     const body = await req.json();
     if (!Array.isArray(body?.messages)) throw new Error('Invalid body');
     messages = body.messages;
+    // Optional, and omitted from the upstream call when absent so the app keeps
+    // Groq's default. The eval harness sends 0 for graded runs — without this,
+    // every measurement would be sampled at the default temperature and a
+    // prompt diff would be indistinguishable from noise.
+    if (typeof body.temperature === 'number' && Number.isFinite(body.temperature)) {
+      temperature = Math.min(Math.max(body.temperature, 0), 2);
+    }
   } catch {
     return jsonError('Invalid request body', 400);
   }
@@ -51,6 +59,7 @@ export default async function handler(req: Request): Promise<Response> {
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
         max_tokens: 4096,
         stream: true,
+        ...(temperature !== undefined && { temperature }),
       }),
     });
   } catch {

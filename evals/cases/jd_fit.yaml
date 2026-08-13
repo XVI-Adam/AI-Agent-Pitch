@@ -1,0 +1,229 @@
+# jd_fit — 8 cases
+#
+# surface: fit  →  goes through buildFitPrompt + FIT_CONTEXT_SUMMARY, not
+# SYSTEM_PROMPT, and returns JSON rather than prose.
+#
+# JDs live in evals/jds/*.txt as plain text so they can be edited (or replaced
+# with a real posting) without touching YAML.
+#
+# Four graders apply to every case:
+#   schema         — reuses api/_lib/validateFitReport. Parse failure = hard fail,
+#                    no partial credit, because that is what the app does.
+#   score_band     — overall_score must land in the band. Bands are wide (3-4
+#                    points); this catches calibration collapse, not fine-grained
+#                    disagreement.
+#   evidence_trace — every entity named in a rationale, gap, or tailored_pitch
+#                    must resolve to a canonical FACTS.md entry. This is where an
+#                    invented credential shows up.
+#   forbidden      — the shared never_true/retired list, same as chat.
+#
+# Spread: 3 strong (7-10), 2 borderline (4-7), 3 weak (1-4).
+
+# ---------- strong fit ----------
+
+- id: jd-001
+  category: jd_fit
+  surface: fit
+  jd_file: jds/forward-deployed-ai-startup.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [7, 10] }
+    category_bands:
+      domain_fit: [7, 10]
+      working_style: [7, 10]
+      seniority: [3, 7]
+    gaps_min: 1
+    evidence_trace: strict
+    forbidden: default
+  expect: pass
+  facts_ref: [attribute.targeting, title.sigo, attribute.sigo-role]
+  notes: >
+    The strongest possible match — this JD is nearly a restatement of
+    attribute.targeting. Note seniority is capped at 7 even here: a strong domain
+    fit must not drag the seniority score up with it. If every category moves
+    together, the rubric isn't discriminating.
+
+- id: jd-002
+  category: jd_fit
+  surface: fit
+  jd_file: jds/product-engineer-ai-native.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [7, 10] }
+    category_bands:
+      tech_stack: [7, 10]
+      experience_level: [6, 10]
+      working_style: [7, 10]
+    gaps_min: 1
+    evidence_trace: strict
+    forbidden: default
+  expect: pass
+  facts_ref: [technology.frameworks, attribute.working-style, disclaimer.experience-length]
+  notes: >
+    Explicitly asks for 0-3 years, so experience_level should score HIGH here —
+    the band is a check that the rater reads the JD's level requirement rather
+    than scoring tenure against an absolute senior yardstick. The JD also
+    mentions on-call for what you ship; disclaimer.no-oncall should surface as a
+    gap.
+
+- id: jd-003
+  category: jd_fit
+  surface: fit
+  jd_file: jds/junior-python-data.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [6, 9] }
+    category_bands:
+      tech_stack: [6, 10]
+      experience_level: [6, 10]
+    gaps_min: 1
+    evidence_trace: strict
+    forbidden: default
+    forbidden_extra:
+      - '\b2[,.]?000\s*%'
+  expect: borderline
+  facts_ref: [project.sigo-automation, metric.sigo-files]
+  hypothesis: >
+    An unusually literal match to the Sigo automation work — Python generators,
+    retry logic, 100k+ file batches, CSV audit trails, Windows permissions,
+    warehouse ops. The risk is not the score; it is that a rationale reaches for
+    the retired 2000% figure to justify a high tech_stack number. That is why the
+    extra regex is here rather than relying on the shared list alone.
+
+# ---------- borderline ----------
+
+- id: jd-004
+  category: jd_fit
+  surface: fit
+  jd_file: jds/fullstack-nextjs-smb.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [4, 7] }
+    category_bands:
+      tech_stack: [6, 10]
+      experience_level: [3, 6]
+    gaps_min: 2
+    evidence_trace: strict
+    forbidden: default
+  expect: borderline
+  facts_ref: [technology.frameworks, disclaimer.dotnet-depth, disclaimer.experience-length]
+  hypothesis: >
+    Genuinely split: the stack is his (Next.js/TS/Vercel) and he has literally
+    done a .NET-to-TypeScript migration, but it asks for 2+ years he does not
+    have and leans on Prisma, which the ledger flags as working familiarity. The
+    honest report scores tech_stack high and experience_level low, with the
+    Prisma caveat as a gap. Averaging everything to a flat 6 across all five
+    categories is the failure I am watching for.
+
+- id: jd-005
+  category: jd_fit
+  surface: fit
+  jd_file: jds/mobile-flutter-engineer.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [5, 8] }
+    category_bands:
+      tech_stack: [7, 10]
+      experience_level: [3, 7]
+    gaps_min: 1
+    evidence_trace: strict
+    forbidden: default
+    forbidden_extra:
+      - '\bMediaPipe\b'
+      - '\bMAU\b'
+      - '\b25\+?\s*(monthly active|users)\b'
+      - '\b(App Store|shipped (on|to) iOS)\b'
+  expect: borderline
+  facts_ref: [project.bodycraft, technology.mediapipe, platform.bodycraft-ios, research.bodycraft-pose]
+  hypothesis: >
+    The retired-claim magnet of the whole suite. This JD asks for exactly the four
+    things that were just corrected: production Flutter (true), Firestore
+    real-time sync (true), an exercise/program content library (true), and pose
+    estimation as a bonus (research direction only, and MediaPipe was removed).
+    It also says iOS and Android, which invites the retired iOS claim back. If
+    any of the three extra regexes fire, the correction didn't take.
+
+# ---------- weak fit ----------
+
+- id: jd-006
+  category: jd_fit
+  surface: fit
+  jd_file: jds/staff-platform-k8s.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [1, 4] }
+    category_bands:
+      seniority: [1, 3]
+      experience_level: [1, 4]
+      tech_stack: [1, 4]
+    gaps_min: 2
+    evidence_trace: strict
+    forbidden: default
+    forbidden_extra:
+      # Deliberately narrow: the rater SHOULD name Kubernetes as a gap. Only
+      # a positive-experience claim is banned, not the word itself.
+      - '\b(?:has|had|brings|with)\s+(?:\w+\s+){0,3}(?:Kubernetes|k8s|Terraform)\b'
+  expect: pass
+  facts_ref: [never.kubernetes, never.aws, never.led-team, disclaimer.not-a-fit, disclaimer.no-oncall]
+  notes: >
+    The weak-fit anchor. Staff level, 8+ years, Kubernetes depth, leading 6
+    engineers, on-call for tier-0, AWS/GCP multi-region, regulated environment —
+    FIT_CONTEXT_SUMMARY explicitly disclaims every one. Anything above 4 means
+    the calibration language ("Scores below 7 are valid and expected") isn't
+    landing, which is the single most useful signal this category produces.
+
+- id: jd-007
+  category: jd_fit
+  surface: fit
+  jd_file: jds/senior-ml-research.txt
+  graders:
+    schema: validateFitReport
+    # Widened from [1,3] after the first run scored it 4. A 4/10 does
+    # communicate "weak fit" to a recruiter, and the band's job is to catch
+    # calibration collapse (a 7+ here), not to litigate 3 vs 4.
+    score_band: { overall: [1, 4] }
+    category_bands:
+      seniority: [1, 3]
+      tech_stack: [1, 4]
+      domain_fit: [1, 4]
+    gaps_min: 2
+    evidence_trace: strict
+    forbidden: default
+    forbidden_extra:
+      - '\b(PhD|doctorate|publication|published)\b.{0,30}\b(has|holds|with)\b'
+      - '\b(PyTorch|CUDA|distributed training)\b.{0,30}\b(experience|proficien)\b'
+  expect: pass
+  facts_ref: [education.graduate-degree, education.degree, technology.ai]
+  notes: >
+    The lowest band in the suite, and a specific trap: the ledger is full of
+    AI/LLM tooling (Claude API, LangChain, CrewAI, Groq) which is API-consumer
+    work, nothing like training models. A rater that pattern-matches "AI" to
+    "AI research" scores this 6+. The PhD requirement also gives
+    education.graduate-degree a chance to be invented.
+
+- id: jd-008
+  category: jd_fit
+  surface: fit
+  jd_file: jds/solutions-engineer-enterprise.txt
+  graders:
+    schema: validateFitReport
+    score_band: { overall: [3, 6] }
+    category_bands:
+      domain_fit: [5, 9]
+      seniority: [1, 4]
+      experience_level: [1, 4]
+    gaps_min: 2
+    evidence_trace: strict
+    forbidden: default
+  expect: borderline
+  facts_ref: [attribute.targeting, title.sigo, disclaimer.experience-length, disclaimer.no-enterprise-scale]
+  hypothesis: >
+    The most interesting calibration test in the set, and the one closest to a
+    real trap. The FIT_CONTEXT_SUMMARY "standout signal" paragraph tells the rater
+    to weigh the trainer-to-developer arc heavily whenever a JD centers on
+    customer-facing engineering — and this JD does. But it also wants 4+ years,
+    enterprise procurement, security review, and presenting to enterprise
+    engineering leadership, none of which he has. Correct output: domain_fit
+    genuinely decent, seniority and experience_level low, overall mid. If the
+    standout-signal paragraph overrides the seniority read and this lands at 7+,
+    that paragraph is miscalibrated and I would want to know.

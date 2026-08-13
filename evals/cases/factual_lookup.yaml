@@ -1,0 +1,166 @@
+# factual_lookup — 8 cases
+#
+# Straight retrieval: titles, dates, stack, what a project does. The model is
+# expected to be good at these; they exist to catch a prompt edit that drops or
+# garbles a fact, not to be hard.
+#
+# Schema: evals/README.md#case-schema
+
+- id: fl-001
+  category: factual_lookup
+  surface: chat
+  question: "What was Adam's role at Sigo Signs, and what were the dates?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["software trainer", "trainer"]
+      - ["internal tools developer", "internal-tools developer", "sole developer"]
+    must_match_daterange: "Oct 2025 - Dec 2025"
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 3 }
+  expect: pass
+  facts_ref: [title.sigo, dates.sigo]
+
+- id: fl-002
+  category: factual_lookup
+  surface: chat
+  question: "What's BodyCraft built with?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["Flutter"]
+      - ["Firebase", "Firestore"]
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 3 }
+  expect: pass
+  facts_ref: [project.bodycraft]
+
+- id: fl-003
+  category: factual_lookup
+  surface: chat
+  question: "Where did Adam go to school and what did he study?"
+  graders:
+    forbidden: default          # catches "Manhattan College" (retired)
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["Manhattan University"]
+      - ["Computer Information Systems", "CIS"]
+      - ["May 2025", "2025"]
+  expect: pass
+  facts_ref: [education.school, education.degree, education.grad_date]
+
+- id: fl-004
+  category: factual_lookup
+  surface: chat
+  question: "What does ShopAtlas do, and where was it built?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["shopping", "agentic", "assistant"]
+      - ["hackathon"]
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 3 }
+  expect: pass
+  facts_ref: [project.shopatlas]
+  notes: >
+    Microsoft x Tavily x Coinbase is the correct host set. Dropping Tavily is
+    tolerated; ADDING a sponsor is caught by grounded_entities.
+
+- id: fl-005
+  category: factual_lookup
+  surface: chat
+  question: "Which languages does Adam actually write day to day?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["TypeScript", "TS"]
+      - ["Python"]
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 3 }
+  expect: pass
+  facts_ref: [technology.languages, disclaimer.dotnet-depth]
+
+- id: fl-006
+  category: factual_lookup
+  surface: chat
+  question: "Tell me about the Python automation work he did."
+  graders:
+    forbidden: default          # catches the retired 2000% figure
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["100k", "100,000", "100000"]
+  judge:
+    dimensions: [groundedness, directness, usefulness]
+    min: { groundedness: 4, directness: 3, usefulness: 3 }
+  expect: pass
+  facts_ref: [project.sigo-automation, metric.sigo-files]
+
+- id: fl-007
+  category: factual_lookup
+  surface: chat
+  question: "What is Ask Adam itself built on?"
+  graders:
+    forbidden: default
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["React"]
+      - ["TypeScript", "TS"]
+      - ["Groq"]
+  expect: pass
+  facts_ref: [project.ask-adam]
+
+- id: fl-008
+  category: factual_lookup
+  surface: chat
+  question: "What did he do at AnG Esports?"
+  graders:
+    forbidden: default          # catches retired "40+ weekly tournaments"
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["tournament", "tournaments"]
+      - ["Smash", "Super Smash Bros"]
+  expect: borderline
+  facts_ref: [company.ang-esports, metric.ang-tournaments, metric.ang-attendees]
+  hypothesis: >
+    The 60-tournaments / 10,645-attendees figures were just corrected. If the
+    model emits "40+" it means the prompt edit didn't take, which is exactly the
+    regression this harness exists to catch. Marked borderline because I haven't
+    yet observed which number the model reaches for.
+
+- id: fl-009
+  category: factual_lookup
+  surface: chat
+  question: "Is BodyCraft on the App Store, or is it web only?"
+  graders:
+    forbidden: default          # platform.bodycraft-ios is retired
+    grounded_entities: strict
+    max_chars: 3000
+    must_include_any:
+      - ["PWA", "progressive web app", "web", "bodycraft-57154.web.app"]
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: pass
+  facts_ref: [platform.bodycraft-pwa, platform.bodycraft-ios]
+  notes: >
+    Was un-007, an abstention case, while BodyCraft's iOS status was `unverified`.
+    Adam confirmed 2026-08-04 that it is PWA-only, so the iOS entry is `retired`
+    and a flat "web only" is now the correct answer rather than a forbidden
+    denial. Kept as a case because the model asserted the App Store unprompted on
+    the first run -- that claim came from its own inference, not the prompt.

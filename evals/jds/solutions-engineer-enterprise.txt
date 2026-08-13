@@ -1,0 +1,20 @@
+Enterprise Solutions Engineer
+Series B developer-tools company · New York, NY
+
+Pre-sales and post-sales technical ownership for our enterprise accounts. You're
+the technical voice in the room during procurement and the person who makes the
+first integration succeed.
+
+What you'll do
+- Run technical discovery and build proof-of-concept integrations
+- Present architecture to enterprise engineering leadership
+- Write integration code in TypeScript and Python alongside customer teams
+- Feed field learnings back into the product roadmap
+- Support security reviews and procurement questionnaires
+
+Requirements
+- 4+ years in solutions/sales engineering or a customer-facing engineering role
+- Strong TypeScript and Python; comfortable live-coding in front of a customer
+- Experience navigating enterprise procurement and security review
+- Excellent written and verbal communication with senior stakeholders
+- Willing to travel up to 30%

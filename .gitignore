@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 .env
 .env.local
+
+.vercel
+
+# eval harness
+evals/.cache
+evals/results/*.json
+evals/results/*.jsonl
+evals/results/*.md

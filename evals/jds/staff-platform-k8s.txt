@@ -1,0 +1,19 @@
+Staff Platform Engineer
+Series D fintech · 900 employees · San Francisco (Hybrid)
+
+We're looking for a Staff Platform Engineer to lead the evolution of our
+container platform serving 200+ engineers across 40 teams.
+
+Responsibilities
+- Set multi-year technical direction for our Kubernetes platform
+- Lead a team of 6 platform engineers; mentor senior ICs
+- Own SLOs, incident response, and the on-call rotation for tier-0 services
+- Drive multi-region failover architecture across AWS and GCP
+- Partner with security and compliance on SOC 2 and PCI requirements
+
+Requirements
+- 8+ years of infrastructure engineering, 3+ at staff level or equivalent
+- Deep Kubernetes expertise — operators, CRDs, multi-cluster federation
+- Production experience with Terraform, service mesh, and observability stacks
+- Track record leading engineers and setting technical direction at scale
+- Experience in a regulated environment (financial services strongly preferred)

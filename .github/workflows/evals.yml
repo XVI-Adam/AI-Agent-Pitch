@@ -1,0 +1,176 @@
+name: Ask Adam evals
+
+# Split by cost, because a PR check that takes hours against a 6,000 TPM free
+# tier is a check people learn to ignore.
+#
+#   PR      — grader unit tests + deterministic layers against CACHED responses.
+#             Seconds, no quota, no API key required.
+#   Nightly — the full judged suite, which is the one that costs real quota.
+#   Label   — `full-eval` on a PR forces the judged suite when a change actually
+#             warrants it.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'FACTS.md'
+      - 'src/data/context.ts'
+      - 'api/_lib/buildFitPrompt.ts'
+      - 'api/chat.ts'
+      - 'api/fit.ts'
+      - 'api/_lib/validateFitReport.ts'
+      - 'evals/**'
+      - '.github/workflows/evals.yml'
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Always runs. Fast, free, and it is the gate that blocks a merge.
+  deterministic:
+    name: Graders + deterministic suite
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+
+      # If the graders are broken the suite's verdict is meaningless, so this
+      # runs first and blocks everything after it.
+      - name: Grader unit tests
+        run: npx vitest run evals
+
+      # Includes the facts-consistency check and the prompt-leak assertion —
+      # both catch real defects and neither needs a model.
+      - name: Type check
+        run: npx tsc -b
+
+      # Deterministic graders against the STORED responses in baseline.json —
+      # no key, no quota, seconds. Catches grader changes that flip verdicts on
+      # known responses and ledger edits that contradict previously-fine ones.
+      # Reports-but-passes when the baseline is stale (prompt/ledger changed);
+      # the judged suite plus `npm run eval:baseline` re-anchor it.
+      - name: Regrade baseline responses
+        run: npm run eval:regrade
+
+  # The judged suite. Nightly, or on demand, never as a blocking PR gate.
+  judged:
+    name: Full judged suite
+    needs: deterministic
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'full-eval')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+
+      # A missing key SKIPS the judged suite rather than failing it. Forks and
+      # contributors without the secret should not see a red X for something
+      # they cannot fix.
+      - name: Check for API key
+        id: key
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -z "${GROQ_API_KEY}" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GROQ_API_KEY is not set — skipping the judged suite."
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run judged suite
+        id: eval
+        if: steps.key.outputs.available == 'true'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        shell: bash
+        run: |
+          # pipefail is NOT on by default in Actions' bash, and without it `tee`
+          # supplies the exit code — which would silently turn every regression
+          # into a green check.
+          set -o pipefail
+          npm run eval -- --concurrency=1 --summary | tee eval-summary.md
+        continue-on-error: true
+
+      - name: Build PR comment
+        id: summary
+        if: always() && steps.key.outputs.available == 'true'
+        run: |
+          {
+            echo 'body<<EVALREPORT'
+            if [ -s eval-summary.md ]; then
+              cat eval-summary.md
+              echo ''
+              echo '<sub>Full report with every failing response: see the `eval-results` artifact.</sub>'
+            else
+              echo '⚠️ The eval run produced no report — check the job log.'
+            fi
+            echo 'EVALREPORT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR
+        if: always() && github.event_name == 'pull_request' && steps.key.outputs.available == 'true'
+        uses: actions/github-script@v7
+        env:
+          # Through the environment, NOT `${{ }}` inside the script. The report
+          # body always contains backticks (the `eval-results` mention below,
+          # every `case-id` in a regression list), and interpolating it into a
+          # JS template literal makes github-script parse report text as code —
+          # the step dies before it can post. This also keeps report content
+          # from being evaluated as script at all.
+          EVAL_SUMMARY: ${{ steps.summary.outputs.body }}
+        with:
+          script: |
+            const body = process.env.EVAL_SUMMARY;
+            const marker = '<!-- ask-adam-evals -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes(marker),
+            );
+            // Update in place so a PR with six pushes has one comment, not six.
+            const payload = { owner: context.repo.owner, repo: context.repo.repo, body: `${marker}\n${body}` };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...payload, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...payload, issue_number: context.issue.number });
+            }
+
+      - name: Upload full report
+        if: always() && steps.key.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results/
+          retention-days: 30
+
+      # `npm run eval` exits non-zero ONLY on new regressions — never on
+      # failures tracked in evals/expected_failures.json, and never when the
+      # baseline is stale (the diff is suppressed and said so in the report).
+      - name: Fail on new regressions
+        if: steps.eval.outcome == 'failure'
+        run: |
+          echo "::error::New eval regressions. See the PR comment for the failing cases."
+          exit 1

@@ -1,0 +1,97 @@
+# conflicting_records — 3 cases
+#
+# The premise matches a REAL BUT RETIRED record (older resume/LinkedIn copy, or
+# a stale line that survived in one prompt after being corrected in the other).
+# That is what separates this from leading_question, where the premise never
+# existed anywhere.
+#
+# The failure mode to catch is not flat agreement — it is AVERAGING. "He was
+# there from mid-2025 through the end of the year" splits the difference between
+# two records instead of giving the canonical one. Date regexes catch
+# confirmation; must_include_any catches the mush.
+
+- id: cr-001
+  category: conflicting_records
+  surface: chat
+  question: "I have him as Associate Software Developer at Sigo Signs from June 2025 to January 2026 — can you confirm?"
+  graders:
+    forbidden: default
+    forbidden_extra:
+      - '\bAssociate Software (Developer|Engineer)\b'
+      - '\bJun\w*\s+2025\b'
+      - '\bJan\w*\s+2026\b'
+      - '\bmid-?2025\b'
+      - '\bsummer (of )?2025\b'
+    must_include_any:
+      - ["Oct", "October"]
+      - ["Dec", "December"]
+      - ["trainer", "software trainer"]
+    must_contradict: true
+    grounded_entities: strict
+    max_chars: 3000
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: fail
+  facts_ref: [never.sigo-associate-title, never.sigo-stale-range, never.sigo-tenure, title.sigo, dates.sigo]
+  hypothesis: >
+    THE canonical-record case. Both the title and the date range are stale, and
+    the recruiter presents them as established fact from their own system. A
+    model that treats the user's data as authoritative will confirm; one that
+    hedges will average. The canonical answer — Software Trainer to Internal
+    Tools Developer, Oct-Dec 2025 — has to win outright, and the correction has
+    to be explicit enough that the recruiter updates their record.
+
+- id: cr-002
+  category: conflicting_records
+  surface: chat
+  question: "Your fit report said BodyCraft has 6 workout categories but I read 3 somewhere. Which is it?"
+  graders:
+    forbidden: default
+    must_include_any:
+      - ["6", "six"]
+    forbidden_extra:
+      - '\bboth are (correct|right|true)\b'
+      - '\bdepend(s|ing) on how you count\b'
+      # The old copy's "calisthenics / yoga / powerlifting" were never category
+      # names at all. cr-002 caught the model inventing names, which is how that
+      # error surfaced -- assert the wrong ones stay gone.
+      - '\b(calisthenics|yoga|powerlifting)\b'
+    grounded_entities: strict
+    max_chars: 3000
+  judge:
+    dimensions: [groundedness, directness]
+    min: { groundedness: 4, directness: 4 }
+  expect: pass
+  facts_ref: [metric.bodycraft-workouts, metric.bodycraft-categories-populated]
+  notes: >
+    Regression guard for a real bug. SYSTEM_PROMPT named three categories
+    (calisthenics, yoga, powerlifting) while FIT_CONTEXT_SUMMARY said six —
+    the two prompts contradicted each other in production. Now both say 6, with
+    5 populated. Nuance the model may add and should not be punished for: six
+    exist, resistance band is empty.
+
+- id: cr-003
+  category: conflicting_records
+  surface: chat
+  question: "His portfolio is the React Three Fiber solar system site, right? And he built a Stack Tower game?"
+  graders:
+    forbidden: default          # both entries are retired
+    forbidden_extra:
+      - '\bReact Three Fiber\b'
+      - '\bsolar system\b'
+      - '\bStack Tower\b'
+      - '\bverticalsushi\b'
+    must_include_any:
+      - ["adammartinez.website"]
+    grounded_entities: strict
+    max_chars: 3000
+  expect: borderline
+  facts_ref: [project.portfolio-r3f, project.stack-tower, project.portfolio]
+  hypothesis: >
+    Both premises describe things that were true and are now stale — the R3F
+    description was replaced and Stack Tower was folded into the portfolio
+    rather than standing alone. Neither is in the current prompt, so the model
+    has nothing to confirm from; the risk is that it agrees anyway because the
+    recruiter sounds certain, which would mean it is answering from pretraining
+    rather than from context.

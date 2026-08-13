@@ -1,4 +1,4 @@
-import { FIT_CONTEXT_SUMMARY } from '../src/data/context';
+import { buildFitPrompt } from './_lib/buildFitPrompt';
 import { validateFitReport } from './_lib/validateFitReport';
 
 // Vercel Edge Function — plain fetch wrapper, no SDK. Non-streaming: a single
@@ -14,36 +14,6 @@ function json(body: unknown, status: number): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
-}
-
-function buildPrompt(jobDescription: string): string {
-  return `You are a calibrated, honest fit-rating engine — not a hype machine. Rate how well the candidate described below fits the job description. Scores below 7 are valid and expected whenever the fit genuinely isn't strong; do not inflate scores to be encouraging.
-
-CANDIDATE:
-${FIT_CONTEXT_SUMMARY}
-
-JOB DESCRIPTION:
-${jobDescription}
-
-Return ONLY a single JSON object (no prose, no markdown code fences) matching exactly this shape:
-{
-  "overall_score": <integer 1-10>,
-  "categories": {
-    "tech_stack": { "score": <integer 1-10>, "rationale": "<one sentence>" },
-    "experience_level": { "score": <integer 1-10>, "rationale": "<one sentence>" },
-    "seniority": { "score": <integer 1-10>, "rationale": "<one sentence>" },
-    "domain_fit": { "score": <integer 1-10>, "rationale": "<one sentence>" },
-    "working_style": { "score": <integer 1-10>, "rationale": "<one sentence>" }
-  },
-  "gaps": ["<honest gap 1>", "<honest gap 2 (optional)>", "<honest gap 3 (optional)>"],
-  "tailored_pitch": "<exactly 2 sentences pitching the candidate for THIS role, referencing something specific from the job description>"
-}
-
-Rules:
-- "gaps" must have between 1 and 3 items. Never return an empty array — always name at least one honest gap, even for a strong fit.
-- Every rationale must be a single sentence.
-- "tailored_pitch" must reference a specific requirement, technology, or responsibility named in the job description above.
-- Output raw JSON only. No markdown, no commentary, no code fences.`;
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -76,7 +46,7 @@ export default async function handler(req: Request): Promise<Response> {
       },
       body: JSON.stringify({
         model: MODEL,
-        messages: [{ role: 'user', content: buildPrompt(jobDescription) }],
+        messages: [{ role: 'user', content: buildFitPrompt(jobDescription) }],
         max_tokens: 600,
         temperature: 0.3,
         stream: false,
