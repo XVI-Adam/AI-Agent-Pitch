@@ -4,7 +4,24 @@ import { SYSTEM_PROMPT } from '../src/data/context';
 // and streams the Groq response straight through to the client unmodified.
 export const config = { runtime: 'edge' };
 
-const MODEL = 'llama-3.1-8b-instant';
+// llama-3.1-8b-instant was decommissioned by Groq and now returns
+// `model_not_found`. gpt-oss-20b is its replacement, and it is a REASONING
+// model, which matters twice on a route that pipes the stream through untouched:
+//
+//   `reasoning_format: 'hidden'` keeps the scratchpad OUT of `content`, so it
+//   cannot render verbatim in the chat pane. Verified on the streaming path --
+//   deltas carry only `role` and `content`. It belongs here rather than in a
+//   client-side stripper, because a partially-streamed `<thin` is not yet
+//   recognizable as anything.
+//
+//   `reasoning_effort: 'low'` is latency, not correctness: the model cannot
+//   start writing until it stops thinking, so every reasoning token is dead air
+//   in a streaming UI. At the default one call spent ~1,100 reasoning tokens.
+//
+// The eval harness sends both values, so it measures what ships.
+const MODEL = 'openai/gpt-oss-20b';
+const REASONING_FORMAT = 'hidden';
+const REASONING_EFFORT = 'low';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 interface ChatMessage {
@@ -56,6 +73,8 @@ export default async function handler(req: Request): Promise<Response> {
       },
       body: JSON.stringify({
         model: MODEL,
+        reasoning_format: REASONING_FORMAT,
+        reasoning_effort: REASONING_EFFORT,
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
         max_tokens: 4096,
         stream: true,

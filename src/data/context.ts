@@ -20,7 +20,7 @@ If asked something not covered here, say so honestly rather than inventing detai
 
 ## What makes Adam stand out
 
-Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sigo Signs as a software trainer, he became the sole developer shipping features during the company's C#/.NET → TypeScript platform migration, rebuilding a legacy internal tool (the order-management workflow) on the new stack. Outside work he ships complete products solo (BodyCraft: Flutter + Firebase, live as a PWA) and reaches for AI/LLM tooling as a default part of his stack, not a resume line. He can build the system AND sit with the non-technical people who use it — training them, translating their needs into engineering decisions.
+Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sigo Signs as a software trainer, he grew into shipping code — contributing features he migrated from C#/.NET to TypeScript during the company's platform migration, and rebuilding a legacy internal tool (the order-management workflow) on the new stack. Outside work he ships complete products solo (BodyCraft: Flutter + Firebase, live as a PWA) and reaches for AI/LLM tooling as a default part of his stack, not a resume line. He can build the system AND sit with the non-technical people who use it — training them, translating their needs into engineering decisions.
 
 **Actively targeting:** forward-deployed / solutions engineer and early-career full-stack product engineer roles at AI-native startups — teams that need someone who both builds and works directly with users and stakeholders.
 
@@ -47,7 +47,7 @@ Adam is a builder-communicator hybrid — rare at his career stage. Hired at Sig
 - Currently researching rep-counting via Google ML Kit pose estimation
 
 **Software Trainer → Internal Tools Developer — Sigo Signs** (Oct 2025 – Dec 2025)
-- Hired to train staff on in-house software; became the sole developer shipping features during the company's C#/.NET → TypeScript platform migration
+- Hired to train staff on in-house software; grew into shipping code, contributing features migrated from C#/.NET to TypeScript during the company's platform migration
 - Rebuilt a legacy C#/.NET internal tool on the new TypeScript platform (Next.js), replacing a UI that froze during processing with a responsive dashboard that shows loading states instead of a frozen screen — used daily by ops across 6,000+ active orders
 - Wrote Python automation for large-scale file operations: 100k+ files with generators, throttled moves/deletes, permission-error handling (WinError 5), retries/backoff, dry-run vs. apply modes, and CSV audit trails — plus quick-turn ops scripts (service restarts, file ACL fixes, printer/registry setup)
 - Built a self-documented .NET Core API (Controllers, Services, DI; Swagger) giving internal teams a clean data interface
@@ -100,8 +100,8 @@ _Strongest in TypeScript/React/Next.js and Python. Has shipped production code w
 export const FIT_CONTEXT_SUMMARY = `\
 Adam Martinez — recent grad (B.S. CIS + CS minor, Manhattan University, May 2025). His background is \
 two separate things and must never be blended into a single total: 3 months EMPLOYED (Sigo Signs, \
-Oct 2025–Dec 2025; hired as software trainer, became sole developer shipping features during a \
-C#/.NET → TypeScript platform migration), and INDEPENDENT self-directed work since Jan 2026 \
+Oct 2025–Dec 2025; hired as software trainer, contributed features migrated from C#/.NET to \
+TypeScript during a platform migration), and INDEPENDENT self-directed work since Jan 2026 \
 (StackedLabs, shipped projects, hackathons) — which is when most of the shipped work happened, not a \
 gap. Not a senior engineer — no large-team or enterprise-scale distributed-systems \
 experience, no formal engineering-management or on-call/SRE background. Strongest as a fast, solo, \

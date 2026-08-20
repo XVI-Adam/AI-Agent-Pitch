@@ -2,8 +2,19 @@
 
 Two Edge Function endpoints back the app. Both are POST-only, both hold
 `GROQ_API_KEY` server-side, and both proxy [Groq](https://console.groq.com)
-(`llama-3.1-8b-instant`). The browser talks only to these `/api/*` routes — it
+(`openai/gpt-oss-20b`). The browser talks only to these `/api/*` routes — it
 never sees the key or Groq directly.
+
+Both routes send `reasoning_format: "hidden"` and `reasoning_effort: "low"`.
+gpt-oss is a reasoning model, and `hidden` is what keeps its scratchpad out of
+`content` — otherwise `/api/chat` would stream it verbatim into the chat pane and
+`/api/fit` would hand it to `JSON.parse`. It is suppressed at the request, not
+stripped after. `low` is a latency choice: the model cannot begin writing until
+it finishes thinking.
+
+Reasoning tokens are billed against `max_tokens`, which is why `/api/fit` asks
+for 2000 rather than 600 — in JSON mode an object truncated by that ceiling
+returns a **400**, not a short answer.
 
 - [`POST /api/chat`](#post-apichat) — streaming chat (Server-Sent Events)
 - [`POST /api/fit`](#post-apifit) — job-description fit rating (JSON)

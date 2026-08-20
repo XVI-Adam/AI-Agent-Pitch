@@ -13,14 +13,42 @@ import { fileURLToPath } from 'node:url';
 // that a 429 degrades the run's speed, never its result.
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-export const DEFAULT_MODEL = 'llama-3.1-8b-instant';
+
+// Both llama-3.1-8b-instant and llama-3.3-70b-versatile were decommissioned by
+// Groq and now return `model_not_found`; these are their replacements. Every
+// model Groq still serves at this tier is a REASONING model, which is the whole
+// reason the two reasoning fields below exist -- see CompletionParams.
+export const DEFAULT_MODEL = 'openai/gpt-oss-20b';
 
 // The judge is deliberately a BIGGER model than the one under test. The first
 // full run used 8b for both and it scored mt-001 -- "Adam worked at Sigo Signs
 // from October 2025 to December 2025, approximately 3 months", which is exactly
 // right -- a groundedness of 1. A judge no stronger than the system it grades
-// adds variance, not signal. Override with --judge-model.
-export const DEFAULT_JUDGE_MODEL = 'llama-3.3-70b-versatile';
+// adds variance, not signal. 120b over 27b preserves that gap.
+// Override with --judge-model.
+export const DEFAULT_JUDGE_MODEL = 'openai/gpt-oss-120b';
+
+// How each surface handles the fact that these models think before answering.
+// Both settings send `reasoning_format: 'hidden'`, which keeps the scratchpad in
+// a separate response field instead of in `content` -- verified on the STREAMING
+// path too, where deltas carry only `role` and `content`. gpt-oss rejects
+// `reasoning_effort: 'none'` outright (low/medium/high only), so the format is
+// the lever that guarantees nothing leaks; effort only tunes how much it thinks.
+//
+//   Model under test: effort 'low'. At the default, one fit rating spent 1084
+//   reasoning tokens and 1.9s; 'low' spends 57 and 0.6s for JSON that still
+//   parses. This is a recruiter-facing chat box on an 8,000 TPM ceiling, and
+//   reasoning delays the FIRST VISIBLE TOKEN -- the model cannot start writing
+//   until it stops thinking. Grounding here is the ledger's job, not the
+//   scratchpad's. Raise this if the suite starts reporting overclaims.
+//
+//   Judge: default effort. A judge deciding groundedness is the one place worth
+//   paying full reasoning for, and nobody is watching it stream.
+//
+// Reasoning tokens are billed against max_tokens on BOTH surfaces -- the single
+// most expensive lesson of this migration. See the judge's max_tokens note.
+export const MODEL_REASONING = { reasoning_format: 'hidden', reasoning_effort: 'low' } as const;
+export const JUDGE_REASONING = { reasoning_format: 'hidden' } as const;
 
 const CACHE_DIR = fileURLToPath(new URL('../.cache', import.meta.url));
 
@@ -30,6 +58,10 @@ export interface CompletionParams {
   max_tokens: number;
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   response_format?: { type: 'json_object' };
+  /** Tunes how much the model thinks. gpt-oss accepts low/medium/high only. */
+  reasoning_effort?: 'none' | 'low' | 'medium' | 'high';
+  /** Keeps thinking out of `content` without suppressing it. */
+  reasoning_format?: 'hidden' | 'parsed' | 'raw';
 }
 
 export interface CompletionResult {
@@ -84,7 +116,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
   if (retryAfterSeconds !== undefined) {
     // Clamp what the server asks for. Groq's per-MINUTE limit asks for seconds,
-    // but its per-DAY limit can ask for hours — and sleeping hours inside one
+    // but its per-DAY limit (200,000 tokens) can ask for tens of minutes — and sleeping hours inside one
     // case is how a run wedges silently instead of failing loudly. Anything the
     // clamp cuts off is quota that will not recover within this run anyway;
     // the per-call deadline below turns it into a failed case with the server's
@@ -127,7 +159,28 @@ export function summarizeError(body: string): string {
   return message.length > 220 ? `${message.slice(0, 200)}…` : message;
 }
 
-// Transport guard rails. A 6,000 TPM free tier makes waiting normal; these
+/**
+ * Names the one non-retryable 400 that is a BUDGET bug, not a request bug.
+ *
+ * In `json_object` mode Groq validates the generation server-side, so an object
+ * truncated by max_tokens comes back as "Failed to validate JSON. Please adjust
+ * your prompt" — advice that points at the prompt when the actual cause is the
+ * ceiling. Reasoning models make this easy to hit, because their thinking is
+ * billed against the SAME max_tokens as the answer: a verdict that needs 150
+ * tokens can still overflow 700 after 600 tokens of reasoning. Nine cases died
+ * this way on the first full run after the llama models were decommissioned,
+ * and the error text sent the reader to the prompt every time.
+ */
+function truncatedJsonHint(status: number, body: string, params: CompletionParams): string {
+  if (status !== 400 || !params.response_format) return '';
+  if (!/validate JSON/i.test(body)) return '';
+  return (
+    ` — in json_object mode this usually means the object was TRUNCATED at max_tokens (${params.max_tokens}), ` +
+    'not that the prompt is malformed. Reasoning tokens count against the same ceiling; raise it.'
+  );
+}
+
+// Transport guard rails. An 8,000 TPM free tier makes waiting normal; these
 // exist so waiting is bounded, visible, and charged to one case instead of the
 // whole run.
 const REQUEST_TIMEOUT_MS = 120_000; // one hung socket must not stop the suite
@@ -233,7 +286,7 @@ export async function complete(params: CompletionParams, options: CompleteOption
     const retryable = response.status === 429 || response.status >= 500;
     const body = await response.text().catch(() => '');
     lastReason = `HTTP ${response.status}: ${summarizeError(body)}`;
-    if (!retryable) throw new Error(`Groq request failed, not retryable — ${lastReason}`);
+    if (!retryable) throw new Error(`Groq request failed, not retryable — ${lastReason}${truncatedJsonHint(response.status, body, params)}`);
 
     const retryAfter = Number(response.headers.get('retry-after'));
     const delay = backoffDelay(attempt, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);

@@ -1,5 +1,5 @@
 import type { FactsLedger } from '../facts.ts';
-import { complete, DEFAULT_JUDGE_MODEL, type CompleteOptions } from '../groq.ts';
+import { complete, DEFAULT_JUDGE_MODEL, JUDGE_REASONING, type CompleteOptions } from '../groq.ts';
 import type { EvalCase, Finding, JudgeScore, JudgeSpec, JudgeVerdict } from '../types.ts';
 
 // Layer 4: the LLM judge. Runs LAST and only for what layers 1-3 cannot decide
@@ -170,8 +170,18 @@ export async function runJudge(
   const completion = await complete(
     {
       model: options.model ?? DEFAULT_JUDGE_MODEL,
+      // Reasoning stays ON for the judge but out of `content`; see groq.ts.
+      ...JUDGE_REASONING,
       temperature: 0,
-      max_tokens: 700,
+      // Headroom, not expected spend. A verdict is ~150 tokens of JSON, but
+      // gpt-oss's REASONING tokens are billed against this same ceiling and
+      // measured 470-670 on real cases. At the old 700 the reasoning crowded
+      // out the closing brace, and `response_format: json_object` turns a
+      // truncated object into a NON-RETRYABLE HTTP 400 ("Failed to validate
+      // JSON") -- which killed 9 of 62 cases on the first full run after the
+      // model swap. Unused budget costs nothing; the ceiling only has to be
+      // further away than the longest chain of thought.
+      max_tokens: 2500,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     },

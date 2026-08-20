@@ -5,7 +5,13 @@ import { validateFitReport } from './_lib/validateFitReport';
 // JSON response is simpler to parse and validate than an SSE stream here.
 export const config = { runtime: 'edge' };
 
-const MODEL = 'llama-3.1-8b-instant';
+// Replaces the decommissioned llama-3.1-8b-instant; see the note in chat.ts.
+// Reasoning is hidden here for the same reason and one more: this route hands
+// `content` straight to JSON.parse, and a scratchpad in front of the object
+// would degrade every rating to `{ ok: false }`.
+const MODEL = 'openai/gpt-oss-20b';
+const REASONING_FORMAT = 'hidden';
+const REASONING_EFFORT = 'low';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_JD_LENGTH = 3000;
 
@@ -46,8 +52,15 @@ export default async function handler(req: Request): Promise<Response> {
       },
       body: JSON.stringify({
         model: MODEL,
+        reasoning_format: REASONING_FORMAT,
+        reasoning_effort: REASONING_EFFORT,
         messages: [{ role: 'user', content: buildFitPrompt(jobDescription) }],
-        max_tokens: 600,
+        // Reasoning tokens are billed against this ceiling, and in
+        // `json_object` mode a truncated object comes back as a NON-retryable
+        // HTTP 400 -- not a short answer. At 600 this route returned 400 on
+        // every request under gpt-oss-20b (measured: 1,084 reasoning tokens at
+        // default effort). Headroom is free; the failure is total.
+        max_tokens: 2000,
         temperature: 0.3,
         stream: false,
         response_format: { type: 'json_object' },

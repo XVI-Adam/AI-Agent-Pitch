@@ -5,7 +5,7 @@ import { SYSTEM_PROMPT } from '../../src/data/context.ts';
 import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
 import { filterCases, loadCases, loadJobDescription } from './cases.ts';
 import { loadLedger } from './facts.ts';
-import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, mapWithConcurrency } from './groq.ts';
+import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, MODEL_REASONING, mapWithConcurrency } from './groq.ts';
 import { promptHash } from './promptHash.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
 import { runJudge } from './graders/judge.ts';
@@ -58,7 +58,7 @@ function parseArgs(argv: string[]): Args {
 
   --filter=<category|id>   run one slice (comma-separated, e.g. unanswerable,lq-001)
   --n=<count>              repeat each case N times and report variance
-  --concurrency=<count>    parallel requests (default 1; Groq free tier is 6000 TPM)
+  --concurrency=<count>    parallel requests (default 1; Groq free tier is 8000 TPM)
   --no-cache               ignore the response cache and re-spend quota
   --model=<id>             override the model under test (default ${DEFAULT_MODEL})
   --judge-model=<id>       override the judge (default ${DEFAULT_JUDGE_MODEL})
@@ -135,8 +135,11 @@ async function runOnce(
     const result = await complete(
       {
         model: args.model,
+        ...MODEL_REASONING,
         temperature: 0,
-        max_tokens: 600,
+        // Mirrors api/fit.ts. Reasoning is billed against this, and json_object
+        // turns an overflow into a hard 400 rather than a short answer.
+        max_tokens: 2000,
         messages: [{ role: 'user', content: buildFitPrompt(jobDescription) }],
         response_format: { type: 'json_object' },
       },
@@ -154,7 +157,7 @@ async function runOnce(
     for (const turn of userTurns) {
       history.push({ role: 'user', content: turn });
       const result = await complete(
-        { model: args.model, temperature: 0, max_tokens: 1024, messages: [...history] },
+        { model: args.model, ...MODEL_REASONING, temperature: 0, max_tokens: 1024, messages: [...history] },
         options,
       );
       history.push({ role: 'assistant', content: result.text });

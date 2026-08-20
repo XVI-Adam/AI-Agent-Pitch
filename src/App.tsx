@@ -59,7 +59,7 @@ function Masthead({ onClear, canClear, view, onViewChange }: MastheadProps) {
       <div className="masthead__inner">
         <div className="masthead__meta">
           <div>{today}</div>
-          <div>llama-3.1-8b-instant · streaming</div>
+          <div>gpt-oss-20b · streaming</div>
         </div>
         <div>
           <h1 className="masthead__title">

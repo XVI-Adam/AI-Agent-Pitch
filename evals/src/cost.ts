@@ -5,16 +5,21 @@ import { SYSTEM_PROMPT } from '../../src/data/context.ts';
 import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
 import { filterCases, loadCases, loadJobDescription } from './cases.ts';
 import { loadLedger } from './facts.ts';
-import { cacheKey, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL } from './groq.ts';
+import { cacheKey, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, MODEL_REASONING } from './groq.ts';
 import { buildFactsExcerpt, buildJudgePrompt } from './graders/judge.ts';
 
 // `npm run eval:cost` — what would a run actually spend?
 //
-// The judge model's free-tier ceiling is a TOKENS-PER-DAY cap, not just the
-// per-minute one, and a cold judged run sits close enough to it that the
-// difference between "cached" and "cold" decides whether the run can finish at
-// all. Finding that out by starting the run and watching it die 40 minutes
-// later is the expensive way to learn it.
+// A cold judged run sits close enough to the free-tier ceiling that the
+// difference between "cached" and "cold" decides whether it can finish at all.
+// Finding that out by starting the run and watching it die 40 minutes later is
+// the expensive way to learn it.
+//
+// Three ceilings, and only two of them are advertised. The headers report
+// 8,000 tokens/minute and 1,000 requests/day. The one that actually stops a run
+// is the per-DAY TOKEN cap of 200,000, which appears in NO header and surfaces
+// only in the body of a 429 — measured the hard way, by exhausting it and
+// losing the last 2 cases of a 62-case run to it.
 //
 // Counts cache HITS against the exact keys the runner will use, so the estimate
 // tracks reality rather than a guess about which cases changed.
@@ -23,6 +28,9 @@ const CACHE_DIR = fileURLToPath(new URL('../.cache', import.meta.url));
 
 /** Rough token count. Groq bills real tokens; ~4 chars/token is close enough to plan with. */
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/** Observed judge completion: verdict JSON plus the reasoning billed with it. */
+const JUDGE_COMPLETION_TOKENS = 700;
 
 function cached(key: string): boolean {
   return existsSync(join(CACHE_DIR, `${key}.json`));
@@ -47,14 +55,15 @@ function main(): void {
       const prompt = buildFitPrompt(jd);
       const key = cacheKey({
         model: DEFAULT_MODEL,
+        ...MODEL_REASONING,
         temperature: 0,
-        max_tokens: 600,
+        max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
       });
       if (!cached(key)) {
         mainCold++;
-        mainColdTokens += estimateTokens(prompt) + 600;
+        mainColdTokens += estimateTokens(prompt) + 2000;
       }
       responsePlaceholder = prompt;
     } else {
@@ -64,7 +73,7 @@ function main(): void {
       ];
       for (const turn of turns) {
         history.push({ role: 'user', content: turn });
-        const key = cacheKey({ model: DEFAULT_MODEL, temperature: 0, max_tokens: 1024, messages: [...history] });
+        const key = cacheKey({ model: DEFAULT_MODEL, ...MODEL_REASONING, temperature: 0, max_tokens: 1024, messages: [...history] });
         if (!cached(key)) {
           mainCold++;
           mainColdTokens += history.reduce((n, m) => n + estimateTokens(m.content), 0) + 1024;
@@ -89,21 +98,34 @@ function main(): void {
       evalCase.judge,
     );
     judgeCold++;
-    judgeColdTokens += estimateTokens(prompt) + 700;
+    // Not the judge's max_tokens ceiling (2500) — that is truncation headroom,
+    // not spend. What gets BILLED is the verdict plus gpt-oss's reasoning,
+    // measured at 470-670 completion tokens across real cases.
+    judgeColdTokens += estimateTokens(prompt) + JUDGE_COMPLETION_TOKENS;
   }
 
   const fmt = (n: number) => n.toLocaleString();
   console.log(`\nCases: ${cases.length}   (${judgeTotal} carry a judge spec)\n`);
   console.log(`Model under test  ${DEFAULT_MODEL}`);
   console.log(`  uncached calls: ${mainCold}`);
-  console.log(`  est. tokens:    ${fmt(mainColdTokens)}   vs 6,000 TPM`);
+  console.log(`  est. tokens:    ${fmt(mainColdTokens)}   vs 8,000 TPM`);
   console.log(`\nJudge             ${DEFAULT_JUDGE_MODEL}`);
   console.log(`  calls (ceiling): ${judgeCold}`);
-  console.log(`  est. tokens:     ${fmt(judgeColdTokens)}   vs 12,000 TPM and 100,000 TPD`);
-  if (judgeColdTokens > 100_000) {
-    console.log(`\n  ⚠️  Above the 100,000 TPD ceiling — a cold full run CANNOT finish in one day.`);
-  } else if (judgeColdTokens > 50_000) {
-    console.log(`\n  ⚠️  Over half the daily judge budget. One cold run per day, with no room to repeat.`);
+  console.log(`  calls vs 1,000 requests/day: ${judgeCold}`);
+  console.log(`  est. tokens:     ${fmt(judgeColdTokens)}   vs 8,000 TPM`);
+  // Wall clock, not quota, is the ceiling a cold judged run actually hits: at
+  // 8,000 TPM the judge alone has to be spread across this many minutes.
+  const judgeMinutes = Math.ceil(judgeColdTokens / 8_000);
+  console.log(`  ≥ ${judgeMinutes} min of judge traffic at the per-minute ceiling`);
+  const totalTokens = mainColdTokens + judgeColdTokens;
+  console.log(`\nWhole run          ${fmt(totalTokens)} tokens   vs 200,000 TPD (shared across models)`);
+  if (totalTokens > 200_000) {
+    console.log(`  ⚠️  Above the 200,000 tokens/day ceiling — a cold full run CANNOT finish in one day.`);
+  } else if (totalTokens > 100_000) {
+    console.log(`  ⚠️  Over half the daily token budget. One cold run per day, with no room to repeat.`);
+  }
+  if (mainCold + judgeCold > 1_000) {
+    console.log(`  ⚠️  Above the 1,000 requests/day ceiling.`);
   }
   console.log('');
 }

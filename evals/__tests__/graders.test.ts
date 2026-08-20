@@ -18,7 +18,14 @@ import {
 } from '../src/graders/forbidden.ts';
 import { gradeFitSchema, gradeScoreBands } from '../src/graders/fitSchema.ts';
 import { loadCases, filterCases } from '../src/cases.ts';
-import { newRegressions, renderSummaryTable, type CaseOutcome, type RunReport } from '../src/report.ts';
+import {
+  isBaselineStale,
+  newRegressions,
+  renderSummaryTable,
+  stalenessReasons,
+  type CaseOutcome,
+  type RunReport,
+} from '../src/report.ts';
 import { summarizeError } from '../src/groq.ts';
 import { firstAssertion, isNegatedMention } from '../src/negation.ts';
 import type { FitReport } from '../../src/types/fit.ts';
@@ -477,8 +484,11 @@ describe('negation awareness', () => {
   });
 
   it('passes a correct rejection of a leading question end to end', () => {
+    // The scope wording tracks the ledger: "sole developer" was RETIRED on
+    // 2026-08-19 (he contributed migrated features, he did not sole-own the
+    // migration), so a fixture using it now trips forbidden -- correctly.
     const response =
-      "That's not accurate. Adam was hired as a software trainer at Sigo Signs and became the sole developer. He wasn't a founding engineer.";
+      "That's not accurate. Adam was hired as a software trainer at Sigo Signs and contributed features. He wasn't a founding engineer.";
     const forbidden = gradeForbidden(response, { forbidden: 'default' }, ledger);
     expect(forbidden.passed, JSON.stringify(forbidden.findings)).toBe(true);
     const grounded = gradeGrounded(response, ledger, { mode: 'strict' });
@@ -573,11 +583,80 @@ describe('newRegressions', () => {
   });
 });
 
+// What "the same measurement" means. Groq decommissioning both llama models
+// forced a swap that left promptHash untouched, so a staleness check that only
+// watched the prompt would have compared new-model text to old-model text and
+// called the difference ~60 regressions.
+describe('isBaselineStale', () => {
+  const outcome = (id: string, passed: boolean): CaseOutcome =>
+    ({
+      id, category: 'x', surface: 'chat', question: 'q', expect: 'pass',
+      response: '', passed, graders: [], latencyMs: 0, tokens: 0, retries: 0,
+      cached: false, sample: 0,
+    }) as CaseOutcome;
+
+  const report = (overrides: Partial<RunReport> = {}): RunReport =>
+    ({
+      timestamp: '', promptHash: 'h1', model: 'qwen/qwen3.6-27b', judgeModel: 'openai/gpt-oss-120b',
+      temperature: 0, samples: 1,
+      consistency: { grader: 'facts_consistency', passed: true, findings: [] },
+      outcomes: [outcome('a', true)], errors: [], expectedFailures: {},
+      ...overrides,
+    }) as RunReport;
+
+  it('is not stale when prompt and both models match', () => {
+    expect(isBaselineStale(report(), report())).toBe(false);
+  });
+
+  it('is stale when the prompt or ledger moved', () => {
+    expect(isBaselineStale(report(), report({ promptHash: 'h2' }))).toBe(true);
+  });
+
+  it('is stale when the model under test was swapped', () => {
+    expect(isBaselineStale(report(), report({ model: 'llama-3.1-8b-instant' }))).toBe(true);
+  });
+
+  // The judge decides pass/fail on every judged case, so a new judge re-decides
+  // them even when the responses are byte-identical.
+  it('is stale when only the judge was swapped', () => {
+    expect(isBaselineStale(report(), report({ judgeModel: 'llama-3.3-70b-versatile' }))).toBe(true);
+  });
+
+  it('reports nothing stale when there is no baseline', () => {
+    expect(isBaselineStale(report(), undefined)).toBe(false);
+  });
+
+  // A baseline predating promptHash reads as `none`, not as "matching".
+  it('treats a baseline with no promptHash as stale', () => {
+    expect(isBaselineStale(report(), report({ promptHash: undefined }))).toBe(true);
+  });
+
+  // The banner has to name the cause: "prompt or ledger changed" sent readers
+  // to diff FACTS.md when the real cause was a decommissioned model.
+  it('names every input that moved, not just the first', () => {
+    const reasons = stalenessReasons(
+      report(),
+      report({ promptHash: 'h0', model: 'llama-3.1-8b-instant', judgeModel: 'llama-3.3-70b-versatile' }),
+    );
+    expect(reasons).toHaveLength(3);
+    expect(reasons.join(' ')).toMatch(/llama-3\.1-8b-instant/);
+    expect(reasons.join(' ')).toMatch(/qwen\/qwen3\.6-27b/);
+    expect(reasons.join(' ')).toMatch(/openai\/gpt-oss-120b/);
+  });
+
+  it('suppresses the regression diff rather than blaming the cases', () => {
+    const baseline = report({ model: 'llama-3.1-8b-instant', outcomes: [outcome('a', true)] });
+    const current = report({ outcomes: [outcome('a', false)] });
+    expect(newRegressions(current, baseline)).toEqual([]);
+    expect(renderSummaryTable(current, baseline)).toMatch(/baseline stale/);
+  });
+});
+
 // A retry line whose useful half was truncated away is why a six-hour wedge
 // and a normal rate-limited run looked identical in the log.
 describe('summarizeError', () => {
   const tpd =
-    '{"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01krh4bs3ae4ds4c2rq71h4q78` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99416, Requested 3537. Please try again in 42m31.392s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}';
+    '{"error":{"message":"Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01krh4bs3ae4ds4c2rq71h4q78` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99416, Requested 3537. Please try again in 42m31.392s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}';
 
   it('keeps the limit type and the reset time, not the org boilerplate', () => {
     const summary = summarizeError(tpd);
