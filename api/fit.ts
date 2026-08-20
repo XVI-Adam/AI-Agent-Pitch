@@ -11,7 +11,7 @@ export const config = { runtime: 'edge' };
 // would degrade every rating to `{ ok: false }`.
 const MODEL = 'openai/gpt-oss-20b';
 const REASONING_FORMAT = 'hidden';
-const REASONING_EFFORT = 'low';
+const REASONING_EFFORT = 'medium';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MAX_JD_LENGTH = 3000;
 

@@ -14,14 +14,14 @@ export const config = { runtime: 'edge' };
 //   client-side stripper, because a partially-streamed `<thin` is not yet
 //   recognizable as anything.
 //
-//   `reasoning_effort: 'low'` is latency, not correctness: the model cannot
+//   `reasoning_effort: 'medium'` is a latency trade, not correctness: the model cannot
 //   start writing until it stops thinking, so every reasoning token is dead air
 //   in a streaming UI. At the default one call spent ~1,100 reasoning tokens.
 //
 // The eval harness sends both values, so it measures what ships.
 const MODEL = 'openai/gpt-oss-20b';
 const REASONING_FORMAT = 'hidden';
-const REASONING_EFFORT = 'low';
+const REASONING_EFFORT = 'medium';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 interface ChatMessage {

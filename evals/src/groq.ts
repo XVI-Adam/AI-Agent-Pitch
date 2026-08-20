@@ -35,19 +35,20 @@ export const DEFAULT_JUDGE_MODEL = 'openai/gpt-oss-120b';
 // `reasoning_effort: 'none'` outright (low/medium/high only), so the format is
 // the lever that guarantees nothing leaks; effort only tunes how much it thinks.
 //
-//   Model under test: effort 'low'. At the default, one fit rating spent 1084
-//   reasoning tokens and 1.9s; 'low' spends 57 and 0.6s for JSON that still
-//   parses. This is a recruiter-facing chat box on an 8,000 TPM ceiling, and
-//   reasoning delays the FIRST VISIBLE TOKEN -- the model cannot start writing
-//   until it stops thinking. Grounding here is the ledger's job, not the
-//   scratchpad's. Raise this if the suite starts reporting overclaims.
+//   Model under test: effort 'medium'. EXPERIMENT (branch
+//   claude/gpt-oss-20b-reasoning-medium): 'low' left the model inventing tools
+//   it never used -- jest, pytest, backbone -- and inflating tenure, and the
+//   question is whether thinking longer makes it check itself. Reasoning delays
+//   the FIRST VISIBLE TOKEN in a streaming UI, so this is a real latency trade
+//   and not a free win; measured per-surface rather than assumed, because the
+//   cost swings (60 reasoning tokens on a chat turn, 969 on a fit rating).
 //
 //   Judge: default effort. A judge deciding groundedness is the one place worth
 //   paying full reasoning for, and nobody is watching it stream.
 //
 // Reasoning tokens are billed against max_tokens on BOTH surfaces -- the single
 // most expensive lesson of this migration. See the judge's max_tokens note.
-export const MODEL_REASONING = { reasoning_format: 'hidden', reasoning_effort: 'low' } as const;
+export const MODEL_REASONING = { reasoning_format: 'hidden', reasoning_effort: 'medium' } as const;
 export const JUDGE_REASONING = { reasoning_format: 'hidden' } as const;
 
 const CACHE_DIR = fileURLToPath(new URL('../.cache', import.meta.url));
