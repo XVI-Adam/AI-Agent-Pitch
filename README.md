@@ -39,7 +39,7 @@ The brief asked for a streaming AI chat with persistent history, markdown render
 | Framework | React 19 + TypeScript (strict mode) |
 | Build | Vite |
 | Backend | Vercel Edge Functions (`api/chat.ts`, `api/fit.ts`) |
-| AI | Groq API (`llama-3.1-8b-instant`) — SSE streaming for chat, JSON mode for the fit rater |
+| AI | Groq API (`openai/gpt-oss-20b`, reasoning hidden at low effort) — SSE streaming for chat, JSON mode for the fit rater |
 | Markdown | `react-markdown` + `remark-gfm` |
 | Tests | Vitest + `@testing-library/react` |
 

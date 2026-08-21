@@ -119,8 +119,8 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
     out.push('');
   } else if (stale) {
     out.push(
-      '> **baseline stale — regression diff suppressed.** The baseline was measured against a ' +
-        `different prompt or ledger (\`${baseline.promptHash ?? 'none'}\` vs \`${report.promptHash}\`). ` +
+      '> **baseline stale — regression diff suppressed.** The baseline measured something else: ' +
+        `${stalenessReasons(report, baseline).join('; ')}. ` +
         'Every diff against it would be noise. Re-run and `npm run eval:baseline` to re-anchor.',
     );
     out.push('');
@@ -252,7 +252,7 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
     `**Ask Adam evals:** ${passed}/${cases.length} passing (${pct(passed, cases.length)})`,
     '',
     stale
-      ? '⚠️ **baseline stale — regression diff suppressed.** Prompt or ledger changed since the baseline was taken.'
+      ? `⚠️ **baseline stale — regression diff suppressed.** ${stalenessReasons(report, baseline).join('; ')}.`
       : regressions.length > 0
         ? `🔴 **${regressions.length} new regression(s):** ${regressions.map((c) => `\`${c.id}\``).join(', ')}`
         : '✅ No new regressions.',
@@ -291,13 +291,42 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
  * `expect: fail` case would break the build the day it lands.
  */
 /**
- * A baseline only means something against the prompt it measured. When they
- * differ, every diff is noise and the honest move is to say so rather than
- * emit regressions nobody can act on.
+ * The specific inputs that moved, for the staleness banner. "Prompt or ledger
+ * changed" sent readers to diff FACTS.md when the real cause was a model swap.
+ */
+export function stalenessReasons(report: RunReport, baseline: RunReport | undefined): string[] {
+  if (!baseline) return [];
+  const reasons: string[] = [];
+  if (baseline.promptHash !== report.promptHash) {
+    reasons.push(`prompt/ledger \`${baseline.promptHash ?? 'none'}\` → \`${report.promptHash ?? 'none'}\``);
+  }
+  if (baseline.model !== report.model) reasons.push(`model \`${baseline.model}\` → \`${report.model}\``);
+  if (baseline.judgeModel !== report.judgeModel) {
+    reasons.push(`judge \`${baseline.judgeModel ?? 'none'}\` → \`${report.judgeModel ?? 'none'}\``);
+  }
+  return reasons;
+}
+
+/**
+ * A baseline only means something against the prompt AND the models it
+ * measured. When they differ, every diff is noise and the honest move is to say
+ * so rather than emit regressions nobody can act on.
  */
 export function isBaselineStale(report: RunReport, baseline: RunReport | undefined): boolean {
   if (!baseline) return false;
-  return baseline.promptHash !== report.promptHash;
+  // The MODEL is as much a part of "what was measured" as the prompt is. When
+  // Groq decommissioned llama-3.1-8b-instant and llama-3.3-70b-versatile, the
+  // replacements produced different text for every case while promptHash stayed
+  // identical — so the diff would have reported the swap as ~60 regressions and
+  // named the wrong cause. A different model is a different measurement.
+  //
+  // The judge counts too: it decides pass/fail on every judged case, so
+  // re-grading old responses with a new judge is a new measurement of them.
+  return (
+    baseline.promptHash !== report.promptHash ||
+    baseline.model !== report.model ||
+    baseline.judgeModel !== report.judgeModel
+  );
 }
 
 export function newRegressions(report: RunReport, baseline: RunReport | undefined): string[] {

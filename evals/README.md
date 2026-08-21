@@ -352,13 +352,21 @@ non-rate-limit 4xx is a bad request, and retrying just burns what's left. One
 case exhausting its retries does not abort the run; it comes back as a named
 error in the report.
 
-**The daily judge budget is the real ceiling — plan around it.** The limit that
-decides whether a run can finish is not the 6,000 TPM on the model under test
-(those 429s clear in 6–25s). It is the **100,000 tokens-per-day** cap on the
-70B judge. 31 of the 62 cases carry a judge spec and a judge call costs ~2,800
-tokens, so a cold full run needs ~86,000 — roughly **one judged run per day,
-with no room to repeat**. Removing the deterministic short-circuit is what put
-every case in front of the judge and made this reachable.
+**Budget the judge before starting a run.** Groq advertises **8,000 tokens per
+minute** and **1,000 requests per day** for both current models. 31 of the 62
+cases carry a judge spec and a judge call costs ~2,800 tokens, so a cold full
+run needs ~86,000 judge tokens — comfortably inside the request ceiling, but at
+8,000 TPM that is at least ~11 minutes of judge traffic alone, which is why the
+run is paced rather than parallel. Removing the deterministic short-circuit is
+what put every case in front of the judge.
+
+**The 200,000 tokens-per-day cap is the ceiling that actually stops a run**, and
+it appears in no rate-limit header — only inside the body of a 429. A full cold
+judged run costs roughly 250,000 tokens, which is *over* the daily budget: plan
+on the response cache carrying most of the model-under-test calls, and expect a
+same-day second run to die partway. `retry-after` on a TPD 429 asks for tens of
+minutes, which the transport clamps to 120s and then fails the case against its
+10-minute deadline — a failed case, not a silent hours-long nap.
 
 ```bash
 npm run eval:cost          # price a run before starting it
@@ -371,7 +379,7 @@ leaves errored cases, which now fail the run and are refused by
 
 **Every wait is bounded and visible.** A run must be able to go slow; it must
 never be able to hang silently. Requests time out at 120s; a server-supplied
-`retry-after` is honored but clamped to 120s (Groq's per-day limit can ask for
+`retry-after` is honored but clamped to 120s (a per-day limit can ask for
 *hours*, which is a failed case, not a nap); each call gets 10 minutes of
 retries total before it fails that one case and the run moves on. Progress
 streams to stderr — one timestamped line per case, one per retry — and each

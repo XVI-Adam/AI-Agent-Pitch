@@ -1,6 +1,6 @@
 name: Ask Adam evals
 
-# Split by cost, because a PR check that takes hours against a 6,000 TPM free
+# Split by cost, because a PR check that takes hours against an 8,000 TPM free
 # tier is a check people learn to ignore.
 #
 #   PR      — grader unit tests + deterministic layers against CACHED responses.

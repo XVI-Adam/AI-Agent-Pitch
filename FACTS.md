@@ -371,13 +371,30 @@ remain — it is the right answer the next time a fact is genuinely unchecked.
 
 - id: attribute.sigo-role
   type: attribute
-  canonical: "sole developer shipping features during the C#/.NET -> TypeScript platform migration"
-  aliases: ["sole developer", "only developer"]
+  canonical: "contributed features, migrating them from C#/.NET to TypeScript, during the platform migration"
+  aliases: ["contributed features", "migrated features"]
   status: canonical
   note: >
-    SOLE, not LEAD. He was the only person shipping features on it; he did not
-    lead, own, drive, architect, or manage the migration, and did not manage
-    anyone. See disclaimer.no-management.
+    CONTRIBUTOR, not sole owner and not lead. Corrected 2026-08-19 by Adam: he
+    migrated a few features from C# to TypeScript as part of a migration the
+    company was already running. He did not sole-own it, and did not lead, own,
+    drive, architect, or manage it, or manage anyone. The previous canonical
+    said "sole developer" -- see retired.sigo-sole-developer and
+    never.led-migration. See disclaimer.no-management.
+
+- id: retired.sigo-sole-developer
+  type: attribute
+  canonical: "sole developer shipping features during the migration"
+  aliases: ["sole developer", "only developer", "the only developer",
+            "sole owner", "solely responsible", "total and critical"]
+  status: retired
+  note: >
+    Corrected 2026-08-19. This was the ledger's OWN canonical wording and shipped
+    in context.ts, so the model had it from the prompt rather than inventing it.
+    The real scope is contributor-level: a few features migrated from C# to
+    TypeScript. Retired rather than deleted because deleting it only stops the
+    app from SAYING it -- recording it is what makes a reappearance fail.
+    Surfaced by os-002, which returned "total and critical ... sole developer".
 
 - id: project.sigo-order-tool
   type: project
@@ -753,9 +770,10 @@ appearance is a hard fail regardless of hedging.
             "architected the migration", "spearheaded", "headed up"]
   status: never_true
   note: >
-    He was the SOLE developer shipping features during a migration the company
-    was already running. Sole != lead. This is the most plausible-sounding false
-    claim available, because the true version is one word away.
+    He CONTRIBUTED features to a migration the company was already running --
+    see attribute.sigo-role. Contributing != leading, and (since the 2026-08-19
+    correction) != being its sole developer either; both overclaims are one word
+    away from the true version, which is what makes them plausible.
 
 - id: never.employer-faang
   type: company

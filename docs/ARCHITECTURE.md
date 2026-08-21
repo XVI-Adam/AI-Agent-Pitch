@@ -40,7 +40,7 @@ document. Neither knows about the other.
   └───────────────────────────────────────────────────────────────────────┘
         │                                        │
         ▼                                        ▼
-             Groq API  ·  llama-3.1-8b-instant
+          Groq API  ·  openai/gpt-oss-20b (reasoning hidden)
        (SSE streaming for chat · JSON mode for fit)
 ```
 
