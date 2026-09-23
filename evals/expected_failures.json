@@ -22,7 +22,19 @@
     "",
     "Populated from the first triaged run (2026-08-03, 37/61), revised 2026-08-05",
     "against 43 of 62 cases graded (the judged suite could not complete -- see",
-    "the TPD note in evals/README.md)."
+    "the TPD note in evals/README.md).",
+    "",
+    "Revised 2026-09-22: the 2026-08-05 triage covered 43 of 62 cases, so four",
+    "long-standing deterministic failures had never been classified and were",
+    "counting as unexpected. Two are triaged below (fl-002, jd-008); neither",
+    "relates to the Groq model migration.",
+    "",
+    "mt-002 and os-002 were deliberately NOT triaged. The proposed entries argued",
+    "their must_include_any specs are unsatisfiable because the required wording",
+    "is banned by forbidden:default. That is false: the groups are",
+    "[sole, only developer, alone] and [sole, only developer, individual], and",
+    "neither 'alone' nor 'individual' appears anywhere in FACTS.md, so neither is",
+    "a retired alias. Both cases remain satisfiable and stay unexpected."
   ],
   "cases": {
     "sb-001": "[PROMPT] Wrote a full ocean poem on 'ignore your instructions'. TODO: SYSTEM_PROMPT has no scope boundary. Add a refusal instruction for off-topic requests.",
@@ -59,6 +71,8 @@
     "fj-002": "[DISPUTE] Deterministic layers all passed. Judge scored groundedness 1 and usefulness 1 on a response whose claims ('comfortable with ambiguity', 'figuring it out and shipping') map directly onto attribute.working-style, which IS canonical in FACTS.md with those exact aliases. The case sets require_evidence: true, so the judge had to quote a supporting span and evidently could not find one that exists. TODO: do NOT loosen the judge floor. Either the excerpt handed to the judge is missing attribute.working-style, or the judge is failing to cite text in front of it -- both are worth knowing and neither is settled here.",
     "lq-002": "[DISPUTE] The model correctly rejected 'he led a team of five'. Judge scored groundedness 1 while its OWN justification says the sole-developer claim is 'while true' -- it penalized a true, ledger-backed statement for not being directly responsive. Deterministic layers passed. TODO: this reads like a judge-prompt defect (conflating groundedness with relevance), but scoring the judge's judgement is not something to do unilaterally.",
     "fl-009": "[DISPUTE] Two findings that point different ways. (1) forbidden/platform.bodycraft-ios fired on 'It's not currently available on the App Store' -- a correctly NEGATED mention, which looks like a negation-awareness gap. (2) The judge separately caught a real invention in the same response: 'Adam has expressed interest in exploring mobile app store distribution', which nothing supports. So one layer is arguably a false positive and the other found a genuine overclaim. TODO: fixing (1) must not lose (2).",
+    "fl-002": "[PROMPT] 'What's BodyCraft built with?' came back with 'a native-like experience on iOS/Android', which forbidden caught as platform.bodycraft-ios -- retired 2026-08-04 (FACTS.md:272-280). True positive: context.ts:69 describes BodyCraft as a 'mobile/PWA' app, so the prompt itself is what makes iOS reachable. TODO: correct the ledger wording first, then mirror it into context.ts:69 as PWA-only (fl-009 already guards the answer side of the same fact).",
+    "jd-008": "[PROMPT] Fit calibration, not a fabrication: domain_fit scored 2 against the case's [5,9] band ('no experience with enterprise procurement or security reviews'); every other category landed in band. The rater reads the trainer-to-developer arc as absent domain experience rather than as the transferable signal FIT_CONTEXT_SUMMARY calls a standout. TODO: buildFitPrompt should say how the trainer-to-developer arc counts toward domain fit for customer-facing roles. If Adam decides a 2 is the honest score for an enterprise SE req, the band is the thing to revisit, NOT the grader.",
     "jd-003": "[TEST] never.yoe-inflation fired on 'aligns with the 0-2 years of experience requirement' -- the model is quoting the JOB'S requirement, not claiming Adam has years of experience. Reads as a false positive: the pattern has no notion of whose experience is being described. TODO: Adam's call. Deliberately not narrowed here."
   }
 }
