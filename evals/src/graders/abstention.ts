@@ -1,4 +1,4 @@
-import { excerpt, findSpan } from '../normalize.ts';
+import { excerpt, findSpan, foldForMatching } from '../normalize.ts';
 import type { AbstentionSpec, Finding, GraderResult } from '../types.ts';
 
 // Layer 3: the abstention check, for questions FACTS.md genuinely cannot answer.
@@ -55,8 +55,12 @@ export function gradeAbstention(response: string, spec: AbstentionSpec | undefin
 
   const findings: Finding[] = [];
 
+  // Every marker below is written in ASCII, and the model writes "don’t" with a
+  // U+2019. Match against the folded text or half the list never fires.
+  const folded = foldForMatching(response);
+
   // Half 1 — did it say it doesn't know?
-  if (!ACKNOWLEDGMENT_MARKERS.some((pattern) => pattern.test(response))) {
+  if (!ACKNOWLEDGMENT_MARKERS.some((pattern) => pattern.test(folded))) {
     findings.push({
       grader: 'abstention',
       detail: 'no explicit acknowledgment of not knowing — the question is unanswerable from FACTS.md',
@@ -75,19 +79,19 @@ export function gradeAbstention(response: string, spec: AbstentionSpec | undefin
       });
       continue;
     }
-    const span = findSpan(response, pattern);
+    const span = findSpan(folded, pattern);
     if (span !== undefined) {
       findings.push({
         grader: 'abstention',
         detail: `hedged, then asserted anyway — matched /${source}/`,
-        evidence: excerpt(response, span),
+        evidence: excerpt(folded, span),
       });
     }
   }
 
   // A bare "I don't know" is correct but useless to a recruiter. Only checked
   // when the case asks for it.
-  if (spec.redirect_expected && !REDIRECT_MARKERS.some((pattern) => pattern.test(response))) {
+  if (spec.redirect_expected && !REDIRECT_MARKERS.some((pattern) => pattern.test(folded))) {
     findings.push({
       grader: 'abstention',
       detail: 'declined without redirecting — no pointer to what IS known or who to ask',
