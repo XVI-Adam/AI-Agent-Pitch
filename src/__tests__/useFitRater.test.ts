@@ -104,4 +104,53 @@ describe('useFitRater', () => {
     const sentBody = JSON.parse(init.body as string);
     expect(sentBody.jobDescription.length).toBe(3000);
   });
+
+  describe('server-reported failure reasons', () => {
+    async function failWith(body: Record<string, unknown>) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => body }));
+      const { result } = renderHook(() => useFitRater());
+      await act(async () => {
+        await result.current.rateFit('We need a React engineer.');
+      });
+      expect(result.current.status).toBe('error');
+      expect(result.current.report).toBeNull();
+      return result.current.error?.message;
+    }
+
+    it('quotes a short server-stated wait on rate_limited', async () => {
+      expect(await failWith({ ok: false, reason: 'rate_limited', retryAfterSeconds: 12 })).toBe(
+        'The rater is busy right now. Try again in about 12s.',
+      );
+    });
+
+    it('says "later" instead of quoting a long wait (a daily quota, not a burst)', async () => {
+      expect(await failWith({ ok: false, reason: 'rate_limited', retryAfterSeconds: 1800 })).toBe(
+        'The rater has hit its usage limit for now. Please try again later.',
+      );
+    });
+
+    it('says "later" when rate_limited carries no wait', async () => {
+      expect(await failWith({ ok: false, reason: 'rate_limited' })).toBe(
+        'The rater has hit its usage limit for now. Please try again later.',
+      );
+    });
+
+    it('does not tell the user to re-paste when the upstream is down or slow', async () => {
+      const down = await failWith({ ok: false, reason: 'upstream_error' });
+      const slow = await failWith({ ok: false, reason: 'timeout' });
+      for (const message of [down, slow]) {
+        expect(message).not.toMatch(/paste/i);
+        expect(message).toMatch(/try again in a moment/i);
+      }
+    });
+
+    it('keeps the re-paste message for invalid_output and for an unknown reason', async () => {
+      expect(await failWith({ ok: false, reason: 'invalid_output' })).toBe(
+        "Couldn't analyze this JD. Try pasting it again.",
+      );
+      expect(await failWith({ ok: false, reason: 'something_new' })).toBe(
+        "Couldn't analyze this JD. Try pasting it again.",
+      );
+    });
+  });
 });

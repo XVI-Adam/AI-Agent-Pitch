@@ -21,6 +21,33 @@ export interface FitRaterError {
 interface FitApiResponse {
   ok: boolean;
   report?: FitReport;
+  reason?: 'rate_limited' | 'upstream_error' | 'timeout' | 'invalid_output';
+  retryAfterSeconds?: number;
+}
+
+class FitServerError extends Error {}
+
+// A server-stated wait beyond this is a daily quota, not a per-minute burst;
+// "try again in 1,800s" is noise, so say "later" instead.
+const MAX_QUOTED_WAIT_S = 90;
+
+// Only `invalid_output` is fixed by pasting again. For the rest the JD is fine
+// and re-submitting straight away (what Retry does) just spends more quota.
+function failureMessage(data: FitApiResponse | null): string {
+  switch (data?.reason) {
+    case 'rate_limited': {
+      const wait = data.retryAfterSeconds;
+      return wait !== undefined && wait <= MAX_QUOTED_WAIT_S
+        ? `The rater is busy right now. Try again in about ${wait}s.`
+        : 'The rater has hit its usage limit for now. Please try again later.';
+    }
+    case 'timeout':
+      return 'The rating service took too long to respond. Try again in a moment.';
+    case 'upstream_error':
+      return 'The rating service is temporarily unavailable. Try again in a moment.';
+    default:
+      return PARSE_FAILURE_MESSAGE;
+  }
 }
 
 export function useFitRater() {
@@ -64,7 +91,7 @@ export function useFitRater() {
       const data = (await response.json().catch(() => null)) as FitApiResponse | null;
 
       if (!response.ok || !data?.ok || !data.report) {
-        throw new Error(PARSE_FAILURE_MESSAGE);
+        throw new FitServerError(failureMessage(data));
       }
 
       setReport(data.report);
@@ -81,7 +108,12 @@ export function useFitRater() {
       } else if (isAbort) {
         setStatus('idle');
       } else {
-        setError({ kind: 'api', message: PARSE_FAILURE_MESSAGE });
+        // Only failures the server reported carry a specific message; anything
+        // else (fetch rejection, offline, DNS) keeps the generic one.
+        setError({
+          kind: 'api',
+          message: err instanceof FitServerError ? err.message : PARSE_FAILURE_MESSAGE,
+        });
         setStatus('error');
       }
     } finally {
