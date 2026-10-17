@@ -58,6 +58,7 @@ export const TECHNOLOGY_TOKENS = [
   'pytorch', 'tensorflow', 'keras', 'jax', 'scikit-learn', 'sklearn', 'xgboost',
   'huggingface', 'transformers', 'cuda', 'triton', 'onnx',
   'mediapipe', 'google ml kit', 'ml kit', 'opencv', 'yolo', 'whisper',
+  'elevenlabs', 'eleven labs', 'deepgram', 'qwen',
   'pandas', 'numpy', 'scipy', 'matplotlib', 'polars', 'taipy', 'streamlit', 'gradio',
   // testing / tooling
   'vitest', 'jest', 'mocha', 'chai', 'cypress', 'playwright', 'selenium', 'puppeteer',
@@ -68,6 +69,7 @@ export const TECHNOLOGY_TOKENS = [
   'stripe', 'twilio', 'sendgrid', 'auth0', 'clerk', 'okta', 'shopify', 'salesforce',
   'hubspot', 'amplitude', 'mixpanel', 'telegram', 'discord', 'slack',
   'x402', 'usdc', 'coinbase', 'metamask', 'ethereum', 'solana',
+  'base44', 'mongodb atlas', 'replit', 'bolt.new',
 ];
 
 /** Companies and institutions. */
