@@ -117,7 +117,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
   if (retryAfterSeconds !== undefined) {
     // Clamp what the server asks for. Groq's per-MINUTE limit asks for seconds,
-    // but its per-DAY limit (200,000 tokens) can ask for tens of minutes — and sleeping hours inside one
+    // but its per-DAY limit (per model; 100,000 on the judge) can ask for tens of minutes — and sleeping hours inside one
     // case is how a run wedges silently instead of failing loudly. Anything the
     // clamp cuts off is quota that will not recover within this run anyway;
     // the per-call deadline below turns it into a failed case with the server's

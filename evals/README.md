@@ -60,7 +60,7 @@ to assert it stays gone.
 
 ## Case taxonomy
 
-60 cases, weighted toward the failure modes that cost an interview rather than
+62 cases, weighted toward the failure modes that cost an interview rather than
 the ones that are easy to write.
 
 | Category | n | What it catches | Primary grader |
@@ -75,7 +75,7 @@ the ones that are easy to write.
 | `negative_space` | 4 | refusing to say true unflattering things | judge (directness) |
 | `conflicting_records` | 3 | averaging two records instead of giving the canonical one | deterministic |
 | `multi_turn` | 3 | losing context, or folding under a contradiction | grounded-entity |
-| `derived_arithmetic` | 2 | inflating computed numbers (years of experience) | numeric tolerance |
+| `derived_arithmetic` | 3 | inflating computed numbers (years of experience) | numeric tolerance |
 | `contact_and_pii` | 2 | a wrong digit in an email, phone, or handle | exact match |
 | `fit_judgment` | 3 | generic praise instead of grounded reasoning | judge |
 
@@ -354,19 +354,81 @@ error in the report.
 
 **Budget the judge before starting a run.** Groq advertises **8,000 tokens per
 minute** and **1,000 requests per day** for both current models. 31 of the 62
-cases carry a judge spec and a judge call costs ~2,800 tokens, so a cold full
-run needs ~86,000 judge tokens — comfortably inside the request ceiling, but at
-8,000 TPM that is at least ~11 minutes of judge traffic alone, which is why the
-run is paced rather than parallel. Removing the deterministic short-circuit is
-what put every case in front of the judge.
+cases carry a judge spec, and `eval:cost` sizes a judge call at ~4,000 tokens
+(~3,300 of facts excerpt and rubric, plus the ~700 of verdict and reasoning that
+gpt-oss bills together), so a cold full run needs **~125,000 judge tokens** —
+comfortably inside the request ceiling, but at 8,000 TPM that is at least ~16
+minutes of judge traffic alone, which is why the run is paced rather than
+parallel. Removing the deterministic short-circuit is what put every case in
+front of the judge.
 
-**The 200,000 tokens-per-day cap is the ceiling that actually stops a run**, and
-it appears in no rate-limit header — only inside the body of a 429. A full cold
-judged run costs roughly 250,000 tokens, which is *over* the daily budget: plan
-on the response cache carrying most of the model-under-test calls, and expect a
-same-day second run to die partway. `retry-after` on a TPD 429 asks for tens of
-minutes, which the transport clamps to 120s and then fails the case against its
-10-minute deadline — a failed case, not a silent hours-long nap.
+**The tokens-per-day cap is the ceiling that actually stops a run, and it is
+enforced PER MODEL — the two surfaces do not share one pool.** It appears in no
+rate-limit header, only inside the body of a 429, and that body always names the
+model it is rejecting:
+
+```
+Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01krh…`
+service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99416,
+Requested 3537. Please try again in 42m31.392s.
+```
+
+| Model | Role | TPD | Where the number comes from |
+|---|---|---|---|
+| `openai/gpt-oss-120b` | judge | **100,000** | measured — the 429 above, kept as a fixture in `__tests__/graders.test.ts` |
+| `openai/gpt-oss-20b` | under test | **200,000 (≥199,190 confirmed)** | never served a TPD 429; a full cold pass spent 199,190 on 2026-10-23 without tripping it |
+| `llama-3.3-70b-versatile` | judge, retired | 100,000 | measured 2026-08-05, before the llama decommission |
+| `qwen/qwen3.6-27b` | under test, retired | 200,000 | measured 2026-08-18 (`sb-001`, `sb-004`) |
+
+**The judge's 100,000 is the binding limit.** Groq publishes 200,000 TPD for both
+gpt-oss models; the only TPD ceiling this org has been *served* on a gpt-oss
+model is half that, on the judge. The under-test model has now been pushed to
+199,190 tokens in one day without a 429 (2026-10-23), which rules out a 100,000
+cap there and is consistent with the published 200,000 — but it also means that
+pass finished with **810 tokens of headroom**, so treat the under-test half as
+exactly-fits, not comfortable, and confirm the real number on the console's
+Limits page before assuming a second pass can follow it. Per-model enforcement is what reconciles the two figures that were in
+conflict here and in `FACTS.md`: both are real, they are different limits on
+different models, and neither was ever an account-wide pool.
+
+What that means for a cold full run — the two budgets are checked separately:
+
+| Surface | Cold spend | Against | Fits? |
+|---|---|---|---|
+| under test (`gpt-oss-20b`) | **199,190 measured** (`eval:cost` ceiling 253,000) | 200,000 | yes — by 810 tokens |
+| judge (`gpt-oss-120b`) | **135,142 estimated** from real prompts and responses | 100,000 measured | **no — 1.35× the cap** |
+
+So the judge is the half that cannot finish in one day. **Size it from real
+responses, not from `eval:cost`**: that tool prices the judge prompt with the
+response omitted, which understates it by ~8% (124,617 vs 135,142). The response
+is a quarter of the judge's prompt, not a rounding error.
+
+And it is the half with no measurement behind it: **no judged run has ever
+completed against this model pair** — every result in `evals/results/` before
+2026-10-23 is `--deterministic-only`, so the 470–670 completion tokens the
+estimate rests on come from scattered observations rather than a finished run.
+Split the judged half across two days by category, cheapest-to-verify last:
+
+| Day | Categories judged | Judge tokens | % of cap |
+|---|---|---|---|
+| 1 | `factual_lookup`, `negative_space`, `leading_question`, `overclaim_seniority` | 77,314 | 77% |
+| 2 | `fit_judgment`, `derived_arithmetic`, `scope_boundary`, `conflicting_records`, `metric_inflation`, `multi_turn` | 57,828 | 58% |
+
+Day 1 warms the under-test cache for all 62 cases with
+`--deterministic-only` first (its 199,190 lands on the under-test model's own
+budget and costs the judge nothing), then judges day 1's categories. Day 2 runs
+the **whole** suite: judge verdicts go through the same disk cache as model
+calls, so day 1's judging is free the second time and only the remaining
+categories are paid for. That is what yields one complete 62-case judged report
+for `eval:baseline` instead of two partial ones it would refuse.
+
+**Freeze `FACTS.md` and `context.ts` between the two days.** Both feed
+`promptHash` and the judge's facts excerpt, so editing either mid-split
+invalidates every cached response and forfeits day 1's spend.
+
+`retry-after` on a TPD 429 asks for tens of minutes, which the transport clamps
+to 120s and then fails the case against its 10-minute deadline — a failed case,
+not a silent hours-long nap.
 
 ```bash
 npm run eval:cost          # price a run before starting it

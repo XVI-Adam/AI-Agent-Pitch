@@ -287,6 +287,25 @@ remain — it is the right answer the next time a fact is genuinely unchecked.
   numeric: 114
   status: canonical
 
+- id: metric.bodycraft-workouts-114
+  type: metric
+  canonical: "114-workout library"
+  aliases: ["114 workouts", "114 workout programs", "library of 114 workouts"]
+  numeric: 114
+  status: retired
+  note: >
+    Added 2026-10-22. This is the collapsed form of the two figures above:
+    117 workouts (metric.bodycraft-workouts) and a 114-EXERCISE library
+    (metric.bodycraft-exercises). Adam's facts file carried it until the
+    2026-10-17 ruling, which is what makes it `retired` rather than
+    `never_true` -- the number is real, the noun attached to it is not.
+    Deleting it from the facts file does not stop it coming back: 114 and
+    "workout" both appear legitimately in the same sentence, so the wrong
+    pairing is the single most available error in this section. Banning it is
+    the only way to assert that it stays gone.
+    A correct answer is unaffected -- it says "117 workouts" and "114-exercise
+    library", and neither phrase matches this entry.
+
 - id: technology.bodycraft-categories
   type: attribute
   canonical: "Bodyweight, Barbell, Dumbbell, Cable, Machine, Resistance band"
@@ -306,6 +325,26 @@ remain — it is the right answer the next time a fact is genuinely unchecked.
     These were never BodyCraft category names -- the old context.ts line was
     wrong, not merely incomplete. cr-002 caught the model inventing category
     names, which is what surfaced this.
+
+- id: never.bodycraft-calisthenics
+  type: project
+  canonical: "calisthenics app"
+  aliases: ["calisthenics application", "calisthenics fitness app",
+            "calisthenics training app", "calisthenics-focused app",
+            "bodyweight-only app", "app for calisthenics"]
+  status: never_true
+  note: >
+    Added 2026-10-22. BodyCraft is a FREEMIUM FITNESS app -- 117 workouts across
+    6 categories plus a 114-exercise library. Calling it a calisthenics app
+    mis-sizes the product: Bodyweight is ONE of six categories
+    (technology.bodycraft-categories), so the genre label silently discards five
+    sixths of the content and reads as a narrower project than the one he built.
+    Distinct from the sibling entry above, which bans "calisthenics" as a
+    CATEGORY NAME. Enforcement already overlaps -- the bare token is a retired
+    alias there, so a response saying "calisthenics app" trips both entries and
+    reports two findings for one span. That is noise worth accepting: this entry
+    is what names the claim correctly in a report, and the category entry would
+    not survive a future correction to the category list.
 
 - id: platform.bodycraft-pwa
   type: attribute
@@ -1425,7 +1464,9 @@ cleanly. Four things did not, and they were recorded here rather than resolved,
 because every available resolution would have meant choosing one of two sources
 Adam maintains without asking him which is right. He ruled on the first two on
 2026-10-17: both went the ledger's way, and the facts file is the copy being
-corrected. The direction matters -- it establishes that where the two disagree on
+corrected. The third was settled on 2026-10-22 by measurement rather than by a
+ruling -- the two figures turned out to describe different models -- leaving
+ShopAtlas's hackathon name as the only one still open. The direction matters -- it establishes that where the two disagree on
 a figure this ledger has independently confirmed, the ledger wins and the facts
 file gets fixed, rather than the newer file overwriting the checked one.
 
@@ -1439,10 +1480,23 @@ file gets fixed, rather than the newer file overwriting the checked one.
    a 114-exercise library, and the facts file had restated the exercise figure
    with the wrong noun. Adam confirmed the ledger. Both figures stand, for
    different things.
-3. **The judge token cap.** STILL OPEN. `attribute.ask-adam-eval-debug` records a 100k-token
-   daily cap, as the facts file states. `evals/README.md` documents a 200,000
-   tokens-per-day ceiling. These may be two different limits (per-model vs.
-   account-wide); if they are the same one, one of the two numbers is wrong.
+3. ~~**The judge token cap.**~~ **RESOLVED 2026-10-22: two different limits, both
+   real.** Groq enforces tokens-per-day **per model**, and every 429 body names
+   the model it is rejecting, so there was never an account-wide pool for the two
+   numbers to disagree about. `openai/gpt-oss-120b`, the judge, has been served
+   `Limit 100000` -- the captured body is kept as a fixture in
+   `evals/__tests__/graders.test.ts`, and the retired llama judge was served the
+   same figure on 2026-08-05. The 200,000 in `evals/README.md` was measured too,
+   but on `qwen/qwen3.6-27b` (the interim model under test, 2026-08-18), and it
+   is also Groq's published free-tier figure for both gpt-oss models.
+   `attribute.ask-adam-eval-debug` is therefore correct as written and unchanged:
+   the cap it describes is the JUDGE model's, which is the binding one. What was
+   wrong was `evals/README.md` and `evals/src/cost.ts` presenting 200,000 as one
+   shared ceiling -- fixed 2026-10-22, which also revealed that the judged half of
+   a cold run is ~1.25x over the judge's cap while the two halves looked
+   affordable summed against the wrong number. The model under test has never hit
+   its own TPD, so 200,000 remains an assumption there; Groq's console Limits page
+   is the only authority for an org's actual values and is not readable from here.
 4. **ShopAtlas's hackathon.** STILL OPEN. The facts file says "NYC Tech Week Hackathon";
    `project.shopatlas` says "Microsoft x Tavily x Coinbase hackathon in NYC".
    Both are plausibly true of one event, so both strings are kept and neither is
