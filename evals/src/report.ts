@@ -1,3 +1,4 @@
+import { describe as describeExpected, type ExpectedFailures } from './expectedFailures.ts';
 import type { Expectation, GraderResult, JudgeVerdict, Surface } from './types.ts';
 
 // Reporting. The stated goal is a diff readable in under 30 seconds, so the
@@ -37,7 +38,7 @@ export interface RunReport {
   consistency: GraderResult;
   outcomes: CaseOutcome[];
   errors: Array<{ id: string; message: string }>;
-  expectedFailures: Record<string, string>;
+  expectedFailures: ExpectedFailures;
 }
 
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
@@ -146,6 +147,43 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
     for (const c of regressions) out.push(...renderFailure(c.representative, c.flaky, c.samples.length));
   }
 
+  const nowPassing = nowPassingExpectedFailures(report);
+  if (nowPassing.length > 0) {
+    out.push(`## 🟡 ${nowPassing.length} expected failure${nowPassing.length === 1 ? '' : 's'} now PASSING`);
+    out.push('');
+    out.push(
+      'These are tracked in `evals/expected_failures.json` as known-bad, and they passed. ' +
+        'Either a fix landed or the case got easier — **delete the entry** to re-arm CI on it. ' +
+        'This blocks the run: an entry that no longer describes reality is how the file goes stale.',
+    );
+    out.push('');
+    for (const id of nowPassing) {
+      const e = report.expectedFailures[id];
+      out.push(`- \`${id}\` · ${e.category} · **[${e.class}]** filed ${e.since} — was: ${e.failure}`);
+    }
+    out.push('');
+  }
+
+  const breaches = categoryFloorBreaches(report, baseline);
+  if (breaches.length > 0) {
+    out.push(`## 🔴 ${breaches.length} categor${breaches.length === 1 ? 'y' : 'ies'} below the failure floor`);
+    out.push('');
+    out.push(
+      'A category came back with more failures than the baseline recorded for it. ' +
+        'This is the check that covers a NEW case failing from birth — it has no baseline ' +
+        'entry to have passed, so the regression diff cannot see it.',
+    );
+    out.push('');
+    out.push('| Category | Failed at baseline | Failing now | Newly failing |');
+    out.push('|---|---|---|---|');
+    for (const b of breaches) {
+      out.push(
+        `| ${b.category} | ${b.baselineFailed} | **${b.runFailed}** | ${b.newlyFailing.map((i) => `\`${i}\``).join(', ')} |`,
+      );
+    }
+    out.push('');
+  }
+
   if (fixed.length > 0) {
     out.push(`## 🟢 ${fixed.length} newly fixed`);
     out.push('');
@@ -186,7 +224,7 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
     out.push('Tracked in `evals/expected_failures.json`. These do not block CI.');
     out.push('');
     for (const c of known) {
-      out.push(`- \`${c.id}\` — ${report.expectedFailures[c.id]}`);
+      out.push(`- ${describeExpected(c.id, report.expectedFailures[c.id])}`);
     }
     out.push('');
   }
@@ -294,6 +332,85 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
  * The specific inputs that moved, for the staleness banner. "Prompt or ledger
  * changed" sent readers to diff FACTS.md when the real cause was a model swap.
  */
+/**
+ * Expected failures that are PASSING now.
+ *
+ * `expected_failures.json` only ever subtracted from the regression list, so a
+ * prompt fix that repaired six known-bad cases produced a greener run and no
+ * signal at all — the entries stayed, and the next reader could not tell which
+ * of them still described reality. An entry that has started passing is stale
+ * bookkeeping, and the whole point of the file is that known-bad must not
+ * accumulate silently, so it is reported and it blocks.
+ *
+ * The fix is to delete the entry, which is also the thing that re-arms CI on
+ * that case.
+ */
+export function nowPassingExpectedFailures(report: RunReport): string[] {
+  const grouped = byCase(report.outcomes);
+  return Object.keys(report.expectedFailures)
+    .filter((id) => grouped.has(id) && grouped.get(id)!.every((s) => s.passed))
+    .sort();
+}
+
+export interface CategoryBreach {
+  category: string;
+  baselineFailed: number;
+  runFailed: number;
+  /** The cases responsible — failing now and not failing at baseline. */
+  newlyFailing: string[];
+}
+
+/**
+ * Per-category failure ceilings.
+ *
+ * The regression diff only looks at cases that PASSED at baseline, which leaves
+ * a hole exactly where this suite is weakest: `leading_question` and
+ * `overclaim_seniority` are known at 0%, so once that is the baseline, a newly
+ * added case in either category can fail from birth and never appear as a
+ * regression — it has no baseline entry to have passed. It just joins the pile.
+ *
+ * So the floor is held per category rather than per case: a category may not
+ * come back with MORE failures than the baseline recorded for it. That catches
+ * a new failing case and a regressed one, and it keeps working as cases are
+ * added, which a hardcoded "these two are at 0%" check would not.
+ *
+ * Compared only over cases present in this run, so a `--filter` slice is judged
+ * against its own share of the baseline rather than against the whole category.
+ */
+export function categoryFloorBreaches(report: RunReport, baseline: RunReport | undefined): CategoryBreach[] {
+  if (!baseline || isBaselineStale(report, baseline)) return [];
+
+  const grouped = byCase(report.outcomes);
+  const baselineById = new Map(baseline.outcomes.map((o) => [o.id, o]));
+
+  const breaches: CategoryBreach[] = [];
+  const categories = [...new Set(report.outcomes.map((o) => o.category))].sort();
+
+  for (const category of categories) {
+    const ids = [...grouped.entries()]
+      .filter(([, samples]) => samples[0].category === category)
+      .map(([id]) => id);
+
+    const runFailed = ids.filter((id) => !grouped.get(id)!.every((s) => s.passed));
+    // Only baseline cases this run actually covered, so a filtered run is fair.
+    const baselineFailed = ids.filter((id) => {
+      const b = baselineById.get(id);
+      return b !== undefined && !b.passed;
+    });
+
+    if (runFailed.length > baselineFailed.length) {
+      const wasFailing = new Set(baselineFailed);
+      breaches.push({
+        category,
+        baselineFailed: baselineFailed.length,
+        runFailed: runFailed.length,
+        newlyFailing: runFailed.filter((id) => !wasFailing.has(id)),
+      });
+    }
+  }
+  return breaches;
+}
+
 export function stalenessReasons(report: RunReport, baseline: RunReport | undefined): string[] {
   if (!baseline) return [];
   const reasons: string[] = [];

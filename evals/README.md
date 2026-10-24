@@ -310,23 +310,67 @@ npm run eval:baseline                     # promote latest run to baseline
 npm run eval:regrade                      # deterministic graders vs. baseline.json — no key, no quota
 ```
 
-`npm run eval` exits **non-zero on new regressions or on any errored case** —
-never on failures already tracked in `expected_failures.json`. That is what CI
-keys on. An errored case produces no result, so a run containing one cannot
-certify anything and fails on its own.
+`npm run eval` exits **non-zero** on any of four things. The first two are the
+model's behavior; the last two are the suite's own bookkeeping, which can rot
+just as quietly:
 
-> **The regression gate is currently REPORT-ONLY.** `baseline.json` predates the
-> three fact corrections on this branch and carries no `promptHash`, so every
-> consumer correctly treats it as stale: failures are reported, not enforced.
-> It stays that way until a full judged run is promoted with
-> `npm run eval:baseline` — which needs a fresh daily judge budget (see the TPD
-> note below). Do **not** hand-edit a `promptHash` into the file to silence the
-> banner; that would arm the gate against responses measured under a different
-> prompt and manufacture phantom regressions.
+| Blocks on | Why |
+|---|---|
+| a new regression | passed at baseline, fails now, not in `expected_failures.json` |
+| an errored case | it produced no result, so the run cannot certify anything |
+| a category over its failure floor | more failures in a category than the baseline recorded — the only check that sees a NEW case failing from birth |
+| an expected failure that PASSES | the entry is stale, and it is also what keeps CI from guarding that case |
+
+> **The regression gate is ARMED** as of 2026-10-24. `baseline.json` is the
+> first complete judged run against `openai/gpt-oss-20b` / `openai/gpt-oss-120b`
+> — 62 cases, 31 passing, 0 errored, `promptHash 204da85dc0006868` — so the
+> diff is enforced rather than reported. It was promoted over two days against
+> the per-model TPD caps (see the budget section); the previous baseline was the
+> llama-era 2026-08-03 record with no `promptHash`, which every consumer
+> correctly treated as stale.
+>
+> If you change `FACTS.md` or `context.ts`, the hash moves and the gate
+> disarms itself until you re-anchor with a fresh judged run. Do **not**
+> hand-edit a `promptHash` into the file to silence the banner; that arms the
+> gate against responses measured under a different prompt and manufactures
+> phantom regressions.
 
 `npm run eval:baseline` shows what promoting would change before asking, and
 warns loudly when a currently-failing case would become the new normal.
-Promoting a bad run is how a suite quietly stops catching things.
+Promoting a bad run is how a suite quietly stops catching things. It refuses
+outright on an errored case or a missing `promptHash`, for the same reason.
+
+### `expected_failures.json`
+
+A known failure is a documented bug with a test attached, not a silenced one.
+Every entry is a structured record, validated on load by
+[`expectedFailures.ts`](src/expectedFailures.ts) — a malformed entry **throws**,
+because an entry that gets silently skipped is a case that stops being guarded
+without anyone choosing that:
+
+```json
+"lq-001": {
+  "class": "TEST",
+  "category": "leading_question",
+  "failure": "what was OBSERVED — the failure mode, not the case's intent",
+  "since": "2026-10-24",
+  "fix_by": "what would remove this entry"
+}
+```
+
+`class` is one of `PROMPT` (the model did the wrong thing and the shipping
+prompt permits it), `LEDGER` (`FACTS.md` is wrong, so the graders measure
+against an out-of-date truth), `TEST` (the case or a grader is wrong and the
+model's answer was fine), or `DISPUTE` (two layers disagree — recorded, not
+arbitrated, because the conflict is the information).
+
+The file is not a parking lot. **An entry whose case starts passing fails the
+run**, which is the only thing that makes a prompt fix visible as a fix and
+stops the file drifting out of date. The fix is to delete the entry, which is
+also what re-arms CI on that case. Of the 34 entries standing before the
+2026-10-24 judged run, **14 had started passing** — filed against
+`llama-3.1-8b-instant` and fixed by the model migration, invisible for two
+months because nothing looked.
 
 ---
 

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT } from '../../src/data/context.ts';
 import { buildFitPrompt } from '../../api/_lib/buildFitPrompt.ts';
 import { loadCases, loadJobDescription } from './cases.ts';
+import { loadExpectedFailures } from './expectedFailures.ts';
 import { loadLedger } from './facts.ts';
 import { promptHash } from './promptHash.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
@@ -35,9 +36,7 @@ function main(): void {
     process.exit(1);
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as RunReport;
-  const expectedFailures: Record<string, string> = existsSync(EXPECTED_FAILURES_PATH)
-    ? (JSON.parse(readFileSync(EXPECTED_FAILURES_PATH, 'utf8')).cases ?? {})
-    : {};
+  const expectedFailures = loadExpectedFailures(EXPECTED_FAILURES_PATH);
 
   const ledger = loadLedger();
   const casesById = new Map(loadCases().map((c) => [c.id, c]));

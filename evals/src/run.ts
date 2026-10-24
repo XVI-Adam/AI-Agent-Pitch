@@ -9,8 +9,11 @@ import { complete, DEFAULT_JUDGE_MODEL, DEFAULT_MODEL, MODEL_REASONING, mapWithC
 import { promptHash } from './promptHash.ts';
 import { gradeFactsConsistency, runDeterministicGraders } from './graders/index.ts';
 import { runJudge } from './graders/judge.ts';
+import { loadExpectedFailures } from './expectedFailures.ts';
 import {
+  categoryFloorBreaches,
   newRegressions,
+  nowPassingExpectedFailures,
   renderMarkdown,
   renderSummaryTable,
   type CaseOutcome,
@@ -262,9 +265,7 @@ async function main(): Promise<void> {
     else errors.push({ id: jobs[index].evalCase.id, message: result.error.message });
   }
 
-  const expectedFailures: Record<string, string> = existsSync(EXPECTED_FAILURES_PATH)
-    ? JSON.parse(readFileSync(EXPECTED_FAILURES_PATH, 'utf8')).cases ?? {}
-    : {};
+  const expectedFailures = loadExpectedFailures(EXPECTED_FAILURES_PATH);
   const baseline: RunReport | undefined = existsSync(BASELINE_PATH)
     ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))
     : undefined;
@@ -317,7 +318,44 @@ async function main(): Promise<void> {
         '\n',
     );
   }
-  process.exit(regressions.length > 0 || report.errors.length > 0 ? 1 : 0);
+
+  // Two more reasons, both about the suite's own bookkeeping rather than the
+  // model's behavior.
+  //
+  // A category over its failure floor is the only check that sees a NEW case
+  // failing from birth: with leading_question and overclaim_seniority baselined
+  // at 0%, such a case has no baseline entry to have passed, so the regression
+  // diff is blind to it and it would just join the pile.
+  //
+  // An expected failure that PASSES is stale bookkeeping. Letting it slide is
+  // how the file stops describing reality -- and the entry is also what keeps
+  // CI from guarding that case, so leaving it costs real coverage.
+  const breaches = categoryFloorBreaches(report, baseline);
+  if (breaches.length > 0) {
+    process.stderr.write(
+      `\n${breaches.length} category/categories above their baseline failure count:\n` +
+        breaches
+          .map(
+            (b) =>
+              `  - ${b.category}: ${b.runFailed} failing vs ${b.baselineFailed} at baseline` +
+              ` (new: ${b.newlyFailing.join(', ') || 'none'})`,
+          )
+          .join('\n') +
+        '\n',
+    );
+  }
+
+  const nowPassing = nowPassingExpectedFailures(report);
+  if (nowPassing.length > 0) {
+    process.stderr.write(
+      `\n${nowPassing.length} expected failure(s) are PASSING — delete their entries in ` +
+        `evals/expected_failures.json to re-arm CI on them:\n  ${nowPassing.join(', ')}\n`,
+    );
+  }
+
+  const blocking =
+    regressions.length > 0 || report.errors.length > 0 || breaches.length > 0 || nowPassing.length > 0;
+  process.exit(blocking ? 1 : 0);
 }
 
 main().catch((err) => {
