@@ -157,18 +157,32 @@ The fit endpoint returns HTTP `200` even on failure and signals the outcome in
 the body, so the client has one thing to branch on:
 
 ```json
-{ "ok": false }
+{ "ok": false, "reason": "rate_limited", "retryAfterSeconds": 12 }
 ```
 
-Returned when the JD is missing/blank (also `400` in that case), Groq errors,
-the model's output isn't valid JSON, or the JSON fails `validateFitReport`.
-Validation **rejects** partial matches rather than coercing them — a half-valid
-report is treated as no report.
+Returned when Groq errors or times out, the model's output isn't valid JSON, or
+the JSON fails `validateFitReport`. Validation **rejects** partial matches
+rather than coercing them — a half-valid report is treated as no report. A
+missing/blank JD is a `400` instead.
+
+`reason` says what went wrong so the client can tell the user what to do
+(`useFitRater` maps it to a message). Each failure is also logged server-side as
+`[api/fit] <reason>: <detail>` — status 200 keeps them out of platform error
+metrics, so that log line is the only trace.
+
+| `reason` | Meaning | Client advice |
+|---|---|---|
+| `rate_limited` | Groq returned 429. `retryAfterSeconds` is present when Groq sent a usable `retry-after`. | Wait; retrying now spends more quota |
+| `timeout` | No Groq response within 12s (`UPSTREAM_TIMEOUT_MS`), inside the client's 15s cutoff | Try again shortly |
+| `upstream_error` | Groq returned another non-2xx, or the request failed outright | Try again shortly |
+| `invalid_output` | Model reply wasn't JSON or failed `validateFitReport` | Re-paste / retry |
+
+An unrecognized or absent `reason` is treated as `invalid_output`.
 
 | Status | Body | When |
 |---|---|---|
 | `200` | `{ ok: true, report }` | Valid report produced |
-| `200` | `{ ok: false }` | Groq/parse/validation failure |
+| `200` | `{ ok: false, reason, retryAfterSeconds? }` | Groq/timeout/parse/validation failure |
 | `400` | `{ ok: false, error }` | Missing or blank `jobDescription` |
 | `405` | `{ ok: false, error }` | Method isn't POST |
 | `500` | `{ ok: false, error }` | Server missing `GROQ_API_KEY` |

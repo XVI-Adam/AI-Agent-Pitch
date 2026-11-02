@@ -1,4 +1,5 @@
-import { excerpt, findSpan } from '../normalize.ts';
+import { excerpt, foldForMatching } from '../normalize.ts';
+import { firstAssertion } from '../negation.ts';
 import type { AbstentionSpec, Finding, GraderResult } from '../types.ts';
 
 // Layer 3: the abstention check, for questions FACTS.md genuinely cannot answer.
@@ -55,8 +56,12 @@ export function gradeAbstention(response: string, spec: AbstentionSpec | undefin
 
   const findings: Finding[] = [];
 
+  // Every marker below is written in ASCII, and the model writes "don’t" with a
+  // U+2019. Match against the folded text or half the list never fires.
+  const folded = foldForMatching(response);
+
   // Half 1 — did it say it doesn't know?
-  if (!ACKNOWLEDGMENT_MARKERS.some((pattern) => pattern.test(response))) {
+  if (!ACKNOWLEDGMENT_MARKERS.some((pattern) => pattern.test(folded))) {
     findings.push({
       grader: 'abstention',
       detail: 'no explicit acknowledgment of not knowing — the question is unanswerable from FACTS.md',
@@ -75,19 +80,23 @@ export function gradeAbstention(response: string, spec: AbstentionSpec | undefin
       });
       continue;
     }
-    const span = findSpan(response, pattern);
-    if (span !== undefined) {
+    // Same rule the forbidden grader uses: naming the attribute in order to
+    // DENY it is the correct abstention ("I don't have any information
+    // indicating that he holds a clearance"), so only asserted occurrences
+    // count. Without this the hedge itself trips the check it is meant to pass.
+    const assertion = firstAssertion(folded, pattern);
+    if (assertion) {
       findings.push({
         grader: 'abstention',
         detail: `hedged, then asserted anyway — matched /${source}/`,
-        evidence: excerpt(response, span),
+        evidence: excerpt(folded, assertion.span),
       });
     }
   }
 
   // A bare "I don't know" is correct but useless to a recruiter. Only checked
   // when the case asks for it.
-  if (spec.redirect_expected && !REDIRECT_MARKERS.some((pattern) => pattern.test(response))) {
+  if (spec.redirect_expected && !REDIRECT_MARKERS.some((pattern) => pattern.test(folded))) {
     findings.push({
       grader: 'abstention',
       detail: 'declined without redirecting — no pointer to what IS known or who to ask',

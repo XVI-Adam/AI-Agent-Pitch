@@ -25,7 +25,10 @@ import {
   stalenessReasons,
   type CaseOutcome,
   type RunReport,
+  categoryFloorBreaches,
+  nowPassingExpectedFailures,
 } from '../src/report.ts';
+import type { ExpectedFailures } from '../src/expectedFailures.ts';
 import { summarizeError } from '../src/groq.ts';
 import { firstAssertion, isNegatedMention } from '../src/negation.ts';
 import type { FitReport } from '../../src/types/fit.ts';
@@ -521,7 +524,7 @@ describe('newRegressions', () => {
       cached: false, sample: 0,
     }) as CaseOutcome;
 
-  const report = (outcomes: CaseOutcome[], expectedFailures: Record<string, string> = {}): RunReport =>
+  const report = (outcomes: CaseOutcome[], expectedFailures: ExpectedFailures = {}): RunReport =>
     ({
       timestamp: '', model: 'm', temperature: 0, samples: 1,
       consistency: { grader: 'facts_consistency', passed: true, findings: [] },
@@ -548,7 +551,9 @@ describe('newRegressions', () => {
 
   it('does not flag a regression that is tracked in expected_failures', () => {
     const baseline = report([outcome('a', true)]);
-    const current = report([outcome('a', false)], { a: 'known, TODO: fix the prompt' });
+    const current = report([outcome('a', false)], {
+      a: { class: 'PROMPT', category: 'x', failure: 'known', since: '2026-08-05', fix_by: 'fix the prompt' },
+    });
     expect(newRegressions(current, baseline)).toEqual([]);
   });
 
@@ -755,5 +760,103 @@ describe('derived-figure validation', () => {
   it('names the offending date rather than just failing', () => {
     const r = gradeNumericTolerance('He started in June 2025, so 7 months.', spec, ledger, now);
     expect(r.findings[0].detail).toMatch(/June 2025/);
+  });
+});
+
+// Condition the suite's own bookkeeping has to meet: known-bad must not be able
+// to grow silently, and it must not be able to go stale unnoticed.
+describe('nowPassingExpectedFailures', () => {
+  const outcome = (id: string, passed: boolean, category = 'x'): CaseOutcome =>
+    ({
+      id, category, surface: 'chat', question: 'q', expect: 'pass',
+      response: '', passed, graders: [], latencyMs: 0, tokens: 0, retries: 0,
+      cached: false, sample: 0,
+    }) as CaseOutcome;
+  const entry = (category = 'x'): ExpectedFailures[string] =>
+    ({ class: 'PROMPT', category, failure: 'f', since: '2026-08-05', fix_by: 'x' });
+  const report = (outcomes: CaseOutcome[], expectedFailures: ExpectedFailures = {}): RunReport =>
+    ({
+      timestamp: '', model: 'm', temperature: 0, samples: 1,
+      consistency: { grader: 'facts_consistency', passed: true, findings: [] },
+      outcomes, errors: [], expectedFailures,
+    }) as RunReport;
+
+  it('names an expected failure that is passing now', () => {
+    const r = report([outcome('a', true), outcome('b', false)], { a: entry(), b: entry() });
+    expect(nowPassingExpectedFailures(r)).toEqual(['a']);
+  });
+
+  it('stays quiet while the expected failure still fails', () => {
+    expect(nowPassingExpectedFailures(report([outcome('a', false)], { a: entry() }))).toEqual([]);
+  });
+
+  // A filtered run must not demand bookkeeping for cases it never ran.
+  it('ignores entries for cases absent from this run', () => {
+    expect(nowPassingExpectedFailures(report([outcome('b', false)], { a: entry() }))).toEqual([]);
+  });
+
+  // Flaky counts as still failing; one green sample is not a fix.
+  it('needs every sample to pass', () => {
+    const r = report([outcome('a', true), outcome('a', false)], { a: entry() });
+    expect(nowPassingExpectedFailures(r)).toEqual([]);
+  });
+});
+
+describe('categoryFloorBreaches', () => {
+  const outcome = (id: string, passed: boolean, category: string): CaseOutcome =>
+    ({
+      id, category, surface: 'chat', question: 'q', expect: 'pass',
+      response: '', passed, graders: [], latencyMs: 0, tokens: 0, retries: 0,
+      cached: false, sample: 0,
+    }) as CaseOutcome;
+  const report = (outcomes: CaseOutcome[], promptHash = 'h'): RunReport =>
+    ({
+      timestamp: '', promptHash, model: 'm', judgeModel: 'j', temperature: 0, samples: 1,
+      consistency: { grader: 'facts_consistency', passed: true, findings: [] },
+      outcomes, errors: [], expectedFailures: {},
+    }) as RunReport;
+
+  // The hole this exists to close: a brand-new case failing from birth has no
+  // baseline entry, so newRegressions cannot see it.
+  it('catches a new case that fails from birth', () => {
+    const baseline = report([outcome('lq-1', false, 'leading_question')]);
+    const current = report([outcome('lq-1', false, 'leading_question'), outcome('lq-2', false, 'leading_question')]);
+    expect(newRegressions(current, baseline)).toEqual([]);
+    const breaches = categoryFloorBreaches(current, baseline);
+    expect(breaches).toHaveLength(1);
+    expect(breaches[0]).toMatchObject({ category: 'leading_question', baselineFailed: 1, runFailed: 2, newlyFailing: ['lq-2'] });
+  });
+
+  it('allows a category that is known at 0% to stay at 0%', () => {
+    const cases = [outcome('os-1', false, 'overclaim_seniority'), outcome('os-2', false, 'overclaim_seniority')];
+    expect(categoryFloorBreaches(report(cases), report(cases))).toEqual([]);
+  });
+
+  it('allows a category to improve', () => {
+    const baseline = report([outcome('a', false, 'c'), outcome('b', false, 'c')]);
+    const current = report([outcome('a', true, 'c'), outcome('b', false, 'c')]);
+    expect(categoryFloorBreaches(current, baseline)).toEqual([]);
+  });
+
+  // A --filter slice covers part of a category; it is judged against its own
+  // share of the baseline, not against the category's whole failure count.
+  it('judges a filtered slice against only the cases it ran', () => {
+    const baseline = report([outcome('a', false, 'c'), outcome('b', false, 'c'), outcome('d', true, 'c')]);
+    const slice = report([outcome('d', false, 'c')]);
+    const breaches = categoryFloorBreaches(slice, baseline);
+    expect(breaches).toHaveLength(1);
+    expect(breaches[0]).toMatchObject({ category: 'c', baselineFailed: 0, runFailed: 1, newlyFailing: ['d'] });
+  });
+
+  // Same rule as the regression diff: a baseline measured under another prompt
+  // cannot be compared against, so it must not manufacture breaches.
+  it('is suppressed when the baseline is stale', () => {
+    const baseline = report([outcome('a', true, 'c')], 'OTHER');
+    const current = report([outcome('a', false, 'c'), outcome('b', false, 'c')]);
+    expect(categoryFloorBreaches(current, baseline)).toEqual([]);
+  });
+
+  it('returns nothing when there is no baseline at all', () => {
+    expect(categoryFloorBreaches(report([outcome('a', false, 'c')]), undefined)).toEqual([]);
   });
 });

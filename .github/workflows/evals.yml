@@ -57,8 +57,10 @@ jobs:
       # Deterministic graders against the STORED responses in baseline.json —
       # no key, no quota, seconds. Catches grader changes that flip verdicts on
       # known responses and ledger edits that contradict previously-fine ones.
-      # Reports-but-passes when the baseline is stale (prompt/ledger changed);
-      # the judged suite plus `npm run eval:baseline` re-anchor it.
+      # ENFORCING since 2026-10-24, when the first complete judged run of the
+      # gpt-oss pair was promoted. It reports-but-passes only while the baseline
+      # is stale (prompt/ledger changed); a fresh judged run plus
+      # `npm run eval:baseline` re-anchor it and re-arm this step.
       - name: Regrade baseline responses
         run: npm run eval:regrade
 
@@ -166,9 +168,11 @@ jobs:
           path: evals/results/
           retention-days: 30
 
-      # `npm run eval` exits non-zero ONLY on new regressions — never on
-      # failures tracked in evals/expected_failures.json, and never when the
-      # baseline is stale (the diff is suppressed and said so in the report).
+      # `npm run eval` exits non-zero on a new regression, an errored case, a
+      # category over its baseline failure count, or an expected failure that
+      # has started PASSING (a stale entry in evals/expected_failures.json).
+      # Never on a failure that is tracked and still failing, and never when
+      # the baseline is stale — then the diff is suppressed and says so.
       - name: Fail on new regressions
         if: steps.eval.outcome == 'failure'
         run: |

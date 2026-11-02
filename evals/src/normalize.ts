@@ -29,15 +29,29 @@ function stripMarkdown(text: string): string {
 }
 
 /**
+ * Marker-matching form: markdown stripped and unicode punctuation folded to
+ * ASCII, but NOTHING removed — apostrophes, commas and case all survive.
+ *
+ * `normalize()` is the wrong tool for the graders that match English markers
+ * ("I don't have", "isn't", "No,"): it drops the apostrophe and the comma those
+ * patterns are written around, so `don'?t` matches neither the raw "don’t" nor
+ * the normalized "don t". Fold the punctuation the model actually emits and
+ * leave the sentence otherwise intact.
+ */
+export function foldForMatching(text: string): string {
+  let out = stripMarkdown(text);
+  for (const [pattern, replacement] of PUNCT_MAP) out = out.replace(pattern, replacement);
+  return out;
+}
+
+/**
  * Canonical comparison form: markdown stripped, unicode punctuation folded to
  * ASCII, lowercased, whitespace collapsed. Preserves word characters, digits,
  * and the punctuation that carries meaning in a fact (`.`, `@`, `/`, `-`, `%`,
  * `+`, `#`) so emails, URLs, "C#", "100k+", and "2000%" survive intact.
  */
 export function normalize(text: string): string {
-  let out = stripMarkdown(text);
-  for (const [pattern, replacement] of PUNCT_MAP) out = out.replace(pattern, replacement);
-  return out
+  return foldForMatching(text)
     .toLowerCase()
     // `>` is kept because the arrow fold above produces "->", which is how
     // FACTS.md writes the trainer -> developer title.
