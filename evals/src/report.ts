@@ -39,6 +39,15 @@ export interface RunReport {
   outcomes: CaseOutcome[];
   errors: Array<{ id: string; message: string }>;
   expectedFailures: ExpectedFailures;
+  /**
+   * Extra samples of the cases that would have blocked, taken after the main
+   * pass (`--confirm=<k>`). Kept apart from `outcomes` on purpose: every count,
+   * rate and baseline promotion is still the main pass alone, and these only
+   * decide whether a flagged flip REPRODUCES. See `contradictedByConfirmation`.
+   */
+  confirmations?: CaseOutcome[];
+  /** Confirmation samples that errored, so the flip could not be checked. */
+  confirmationErrors?: Array<{ id: string; message: string }>;
 }
 
 const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) * 100)}%`);
@@ -56,6 +65,35 @@ function byCase(outcomes: CaseOutcome[]): Map<string, CaseOutcome[]> {
 
 function isFlaky(samples: CaseOutcome[]): boolean {
   return samples.length > 1 && samples.some((s) => s.passed) && samples.some((s) => !s.passed);
+}
+
+/**
+ * True when a confirmation re-sample of `id` came back with the OPPOSITE
+ * verdict to the main pass -- the flip that flagged it did not reproduce.
+ *
+ * Why this exists: `gpt-oss-20b` and its judge are not deterministic at
+ * temperature 0 on Groq. On one commit (06f20a8), with no prompt, ledger or
+ * model change, every nightly run from 2026-11-02 failed, and each reported a
+ * DIFFERENT set of "new regressions" and of "expected failures now passing",
+ * at 48-52% against a 50% baseline. A single fresh sample compared
+ * with a single cached baseline sample turns that noise into a red X every
+ * night, and a check that is red every night is one nobody reads.
+ *
+ * A case is dropped only when a re-sample positively disagrees. A re-sample
+ * that errored proves nothing, so the case keeps blocking -- the conservative
+ * side of a check is the one that reports.
+ */
+export function contradictedByConfirmation(report: RunReport, id: string): boolean {
+  const main = byCase(report.outcomes).get(id);
+  if (!main) return false;
+  const verdict = main.every((s) => s.passed);
+  return (report.confirmations ?? []).some((c) => c.id === id && c.passed !== verdict);
+}
+
+/** Flagged cases whose flip did not reproduce on re-sampling: flaky, not blocking. */
+export function notReproduced(report: RunReport): string[] {
+  const ids = [...new Set((report.confirmations ?? []).map((c) => c.id))];
+  return ids.filter((id) => contradictedByConfirmation(report, id)).sort();
 }
 
 function findingLines(outcome: CaseOutcome): string[] {
@@ -92,7 +130,12 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
   const stale = isBaselineStale(report, baseline);
   const regressions = stale
     ? []
-    : failing.filter((c) => baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
+    : failing.filter(
+        (c) =>
+          baselinePassing.has(c.id) &&
+          !(c.id in report.expectedFailures) &&
+          !contradictedByConfirmation(report, c.id),
+      );
   const known = failing.filter((c) => c.id in report.expectedFailures);
   const other = failing.filter((c) => !regressions.includes(c) && !known.includes(c));
   const fixed = stale
@@ -231,11 +274,27 @@ export function renderMarkdown(report: RunReport, baseline?: RunReport): string 
 
   const retried = report.outcomes.filter((o) => o.retries > 0);
   const flaky = cases.filter((c) => c.flaky);
-  if (retried.length > 0 || flaky.length > 0 || report.errors.length > 0) {
+  if (
+    retried.length > 0 ||
+    flaky.length > 0 ||
+    report.errors.length > 0 ||
+    (report.confirmations ?? []).length > 0 ||
+    (report.confirmationErrors ?? []).length > 0
+  ) {
     out.push('## Run notes');
     out.push('');
     if (flaky.length > 0) {
       out.push(`- **Variance:** ${flaky.map((c) => `\`${c.id}\``).join(', ')} passed on some samples and failed on others.`);
+    }
+    const unconfirmed = notReproduced(report);
+    if (unconfirmed.length > 0) {
+      out.push(
+        `- **Did not reproduce:** ${unconfirmed.map((id) => `\`${id}\``).join(', ')} flipped against the baseline, ` +
+          'then came back the other way on a re-sample. Not blocking; listed so a case that is flaky every night gets looked at.',
+      );
+    }
+    for (const error of report.confirmationErrors ?? []) {
+      out.push(`- **Confirmation errored:** \`${error.id}\` — ${error.message}. Still blocking: an error confirms nothing.`);
     }
     if (retried.length > 0) {
       out.push(`- **Retried:** ${retried.length} call(s) hit a rate limit or transient error and were retried with backoff.`);
@@ -283,7 +342,13 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
   const baselinePassing = new Set((baseline?.outcomes ?? []).filter((o) => o.passed).map((o) => o.id));
   const regressions = stale
     ? []
-    : cases.filter((c) => !c.passed && baselinePassing.has(c.id) && !(c.id in report.expectedFailures));
+    : cases.filter(
+        (c) =>
+          !c.passed &&
+          baselinePassing.has(c.id) &&
+          !(c.id in report.expectedFailures) &&
+          !contradictedByConfirmation(report, c.id),
+      );
 
   const passed = cases.filter((c) => c.passed).length;
   const lines = [
@@ -296,6 +361,15 @@ export function renderSummaryTable(report: RunReport, baseline?: RunReport): str
         : '✅ No new regressions.',
     '',
   ];
+
+  const unconfirmed = notReproduced(report);
+  if (unconfirmed.length > 0) {
+    lines.push(
+      `〰️ **Flaky, not blocking — flipped, then did not reproduce on a re-sample:** ` +
+        unconfirmed.map((id) => `\`${id}\``).join(', '),
+      '',
+    );
+  }
 
   // An errored case has no outcome, so it is absent from the counts above.
   // Saying "50/50 passing" while 12 cases never ran is the failure mode this
@@ -349,6 +423,7 @@ export function nowPassingExpectedFailures(report: RunReport): string[] {
   const grouped = byCase(report.outcomes);
   return Object.keys(report.expectedFailures)
     .filter((id) => grouped.has(id) && grouped.get(id)!.every((s) => s.passed))
+    .filter((id) => !contradictedByConfirmation(report, id))
     .sort();
 }
 
@@ -391,7 +466,10 @@ export function categoryFloorBreaches(report: RunReport, baseline: RunReport | u
       .filter(([, samples]) => samples[0].category === category)
       .map(([id]) => id);
 
-    const runFailed = ids.filter((id) => !grouped.get(id)!.every((s) => s.passed));
+    // A failure that came back passing on a re-sample is noise, not a breach.
+    const runFailed = ids.filter(
+      (id) => !grouped.get(id)!.every((s) => s.passed) && !contradictedByConfirmation(report, id),
+    );
     // Only baseline cases this run actually covered, so a filtered run is fair.
     const baselineFailed = ids.filter((id) => {
       const b = baselineById.get(id);
@@ -456,5 +534,22 @@ export function newRegressions(report: RunReport, baseline: RunReport | undefine
   );
   const nowFailing = [...grouped.entries()].filter(([, s]) => s.some((o) => !o.passed)).map(([id]) => id);
 
-  return nowFailing.filter((id) => baselinePassing.has(id) && !(id in report.expectedFailures));
+  return nowFailing.filter(
+    (id) => baselinePassing.has(id) && !(id in report.expectedFailures) && !contradictedByConfirmation(report, id),
+  );
+}
+
+/**
+ * Every case that would block this run on its main pass alone: the ones worth
+ * paying for a re-sample before the build goes red. Errors are not in here --
+ * an errored case has no verdict to confirm, and it blocks on its own.
+ */
+export function confirmationCandidates(report: RunReport, baseline: RunReport | undefined): string[] {
+  return [
+    ...new Set([
+      ...newRegressions(report, baseline),
+      ...categoryFloorBreaches(report, baseline).flatMap((b) => b.newlyFailing),
+      ...nowPassingExpectedFailures(report),
+    ]),
+  ].sort();
 }

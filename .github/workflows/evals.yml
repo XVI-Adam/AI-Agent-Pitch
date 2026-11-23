@@ -110,7 +110,12 @@ jobs:
           # supplies the exit code — which would silently turn every regression
           # into a green check.
           set -o pipefail
-          npm run eval -- --concurrency=1 --summary | tee eval-summary.md
+          # --confirm=2: gpt-oss and its judge are not deterministic at
+          # temperature 0, so a single fresh sample flips ~10 cases a night
+          # against the baseline with nothing changed. Each case that would
+          # block is re-sampled twice and blocks only if neither re-sample
+          # comes back the other way. Extra quota scales with the flips.
+          npm run eval -- --concurrency=1 --summary --confirm=2 | tee eval-summary.md
         continue-on-error: true
 
       - name: Build PR comment

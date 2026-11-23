@@ -13,7 +13,7 @@ stripped after. `low` is a latency choice: the model cannot begin writing until
 it finishes thinking.
 
 Reasoning tokens are billed against `max_tokens`, which is why `/api/fit` asks
-for 2000 rather than 600 — in JSON mode an object truncated by that ceiling
+for 4000 rather than 600 — in JSON mode an object truncated by that ceiling
 returns a **400**, not a short answer.
 
 - [`POST /api/chat`](#post-apichat) — streaming chat (Server-Sent Events)

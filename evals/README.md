@@ -302,6 +302,7 @@ npm run eval                              # full suite
 npm run eval -- --filter=unanswerable     # one category
 npm run eval -- --filter=lq-001,mi-003    # specific cases
 npm run eval -- --n=3                     # repeat each case, report variance
+npm run eval -- --confirm=2               # re-sample each case that would block; it blocks only if every re-sample agrees
 npm run eval -- --no-cache                # ignore the cache, re-spend quota
 npm run eval -- --concurrency=1           # slower, gentler on the rate limit
 npm run eval -- --deterministic-only      # layers 1-3 only, no judge quota
@@ -505,6 +506,17 @@ against the responses stored in `baseline.json` — no key, no quota, seconds).
 The judged suite runs nightly, on `workflow_dispatch`, or when a PR carries the
 `full-eval` label — and a missing `GROQ_API_KEY` skips it rather than failing,
 so forks don't see a red X they cannot fix.
+
+**The nightly confirms before it goes red.** `gpt-oss-20b` and its judge are
+not deterministic at temperature 0 on Groq: on one commit, with nothing
+changed, every nightly run from 2026-11-02 failed and each named a different
+set of "new regressions" and "expected failures now passing". So the nightly
+passes `--confirm=2`: each case that would block is re-sampled twice, and it
+blocks only if neither re-sample comes back the other way. The ones that do are
+listed as flaky in the summary, not dropped silently. Counts, rates and
+`eval:baseline` still use the main pass alone. A case that fails every
+re-sample still blocks, including one whose baseline pass was the lucky draw;
+that is a baseline question, not noise.
 
 ---
 

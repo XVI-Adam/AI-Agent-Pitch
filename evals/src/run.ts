@@ -12,6 +12,7 @@ import { runJudge } from './graders/judge.ts';
 import { loadExpectedFailures } from './expectedFailures.ts';
 import {
   categoryFloorBreaches,
+  confirmationCandidates,
   newRegressions,
   nowPassingExpectedFailures,
   renderMarkdown,
@@ -39,10 +40,11 @@ interface Args {
   summary: boolean;
   deterministicOnly: boolean;
   cachedOnly: boolean;
+  confirm: number;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false, summary: false, deterministicOnly: false, cachedOnly: false };
+  const args: Args = { n: 1, concurrency: 1, noCache: false, model: DEFAULT_MODEL, judgeModel: DEFAULT_JUDGE_MODEL, json: false, summary: false, deterministicOnly: false, cachedOnly: false, confirm: 0 };
   for (const arg of argv) {
     const [flag, value] = arg.includes('=') ? arg.split(/=(.*)/s) : [arg, undefined];
     switch (flag) {
@@ -56,6 +58,7 @@ function parseArgs(argv: string[]): Args {
       case '--summary': args.summary = true; break;
       case '--deterministic-only': args.deterministicOnly = true; break;
       case '--cached-only': args.cachedOnly = true; break;
+      case '--confirm': args.confirm = Math.max(0, Number(value) || 0); break;
       case '--help':
         console.log(`Usage: npm run eval -- [options]
 
@@ -68,7 +71,9 @@ function parseArgs(argv: string[]): Args {
   --json                   print the JSON report to stdout instead of markdown
   --summary                print only the compact table (what CI posts to a PR)
   --deterministic-only     skip the LLM judge (layers 1-3 only, no judge quota)
-  --cached-only            fail rather than spend quota on a cache miss`);
+  --cached-only            fail rather than spend quota on a cache miss
+  --confirm=<k>            re-sample each case that would block k more times;
+                           it blocks only if every re-sample agrees (CI uses 2)`);
         process.exit(0);
     }
   }
@@ -142,7 +147,7 @@ async function runOnce(
         temperature: 0,
         // Mirrors api/fit.ts. Reasoning is billed against this, and json_object
         // turns an overflow into a hard 400 rather than a short answer.
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: buildFitPrompt(jobDescription) }],
         response_format: { type: 'json_object' },
       },
@@ -284,6 +289,52 @@ async function main(): Promise<void> {
     errors,
     expectedFailures,
   };
+
+  // Confirmation pass. The model under test and the judge are not
+  // deterministic at temperature 0, so one fresh sample against one baseline
+  // sample flags ~10 of 62 cases every night with nothing changed. Before the
+  // build goes red, re-sample just the cases that would make it red; a case
+  // keeps blocking only if no re-sample comes back the other way. Costs quota
+  // in proportion to how many cases flipped, not to the size of the suite.
+  if (args.confirm > 0) {
+    const candidates = confirmationCandidates(report, baseline);
+    if (candidates.length > 0) {
+      const byId = new Map(selected.map((c) => [c.id, c]));
+      const confirmJobs = candidates.flatMap((id) =>
+        // Sample indices past the main pass's, so each gets its own cache salt
+        // and a local re-run cannot "confirm" a flip by replaying it.
+        Array.from({ length: args.confirm }, (_, k) => ({ evalCase: byId.get(id)!, sample: args.n + k })),
+      );
+      process.stderr.write(
+        `\nConfirming ${candidates.length} flagged case(s) x${args.confirm}: ${candidates.join(', ')}\n`,
+      );
+      let confirmed = 0;
+      const confirmSettled = await mapWithConcurrency(confirmJobs, args.concurrency, async (job) => {
+        try {
+          const outcome = await runOnce(job.evalCase, args, apiKey, job.sample);
+          confirmed++;
+          process.stderr.write(
+            `[${timestamp()}] confirm ${String(confirmed).padStart(3)}/${confirmJobs.length}  ` +
+              `${outcome.passed ? 'PASS' : 'FAIL'} ${outcome.id}\n`,
+          );
+          return outcome;
+        } catch (err) {
+          confirmed++;
+          process.stderr.write(
+            `[${timestamp()}] confirm ${String(confirmed).padStart(3)}/${confirmJobs.length}  ` +
+              `ERROR ${job.evalCase.id} — ${(err as Error).message.slice(0, 200)}\n`,
+          );
+          throw err;
+        }
+      });
+      report.confirmations = [];
+      report.confirmationErrors = [];
+      for (const [index, result] of confirmSettled.entries()) {
+        if (result.ok) report.confirmations.push(result.value);
+        else report.confirmationErrors.push({ id: confirmJobs[index].evalCase.id, message: result.error.message });
+      }
+    }
+  }
 
   // Same stamp as the .progress.jsonl so one run's files sort together.
   const stamp = runStamp;
