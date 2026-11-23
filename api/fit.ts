@@ -76,8 +76,10 @@ export default async function handler(req: Request): Promise<Response> {
         // `json_object` mode a truncated object comes back as a NON-retryable
         // HTTP 400 -- not a short answer. At 600 this route returned 400 on
         // every request under gpt-oss-20b (measured: 1,084 reasoning tokens at
-        // default effort). Headroom is free; the failure is total.
-        max_tokens: 2000,
+        // default effort). Headroom is free; the failure is total. Raised to
+        // 4000 after the `jd-003` eval case (a short junior-data JD) came back
+        // as this 400 on every nightly run from 2026-11-02 at 2000.
+        max_tokens: 4000,
         temperature: 0.3,
         stream: false,
         response_format: { type: 'json_object' },

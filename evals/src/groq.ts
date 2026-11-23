@@ -172,12 +172,34 @@ export function summarizeError(body: string): string {
  * this way on the first full run after the llama models were decommissioned,
  * and the error text sent the reader to the prompt every time.
  */
-function truncatedJsonHint(status: number, body: string, params: CompletionParams): string {
+export function truncatedJsonHint(status: number, body: string, params: CompletionParams): string {
   if (status !== 400 || !params.response_format) return '';
   if (!/validate JSON/i.test(body)) return '';
+  // Groq returns what the model actually wrote as `error.failed_generation`.
+  // Read it instead of guessing: an object that stops mid-way is the budget,
+  // one that closes is the model writing invalid JSON, and those are fixed in
+  // different places. `jd-003` errored this way on every nightly run from
+  // 2026-11-02 and the log could not say which it was. The verdict comes back
+  // FIRST in the error, because every log line that shows it cuts at ~160 chars.
+  let generation: string | undefined;
+  try {
+    const parsed = JSON.parse(body) as { error?: { failed_generation?: unknown } };
+    if (typeof parsed.error?.failed_generation === 'string') generation = parsed.error.failed_generation;
+  } catch {
+    // Not JSON; fall through to the generic hint.
+  }
+  if (generation !== undefined) {
+    const trimmed = generation.trim();
+    const tail = trimmed.slice(-80).replace(/\s+/g, ' ');
+    return trimmed.endsWith('}')
+      ? `INVALID JSON from the model, not the budget: failed_generation (${trimmed.length} chars) closes its ` +
+          `object under max_tokens ${params.max_tokens}. Ends: …${tail}`
+      : `TRUNCATED at max_tokens ${params.max_tokens}: failed_generation (${trimmed.length} chars) stops ` +
+          `mid-object. Reasoning tokens count against the same ceiling; raise it. Ends: …${tail}`;
+  }
   return (
-    ` — in json_object mode this usually means the object was TRUNCATED at max_tokens (${params.max_tokens}), ` +
-    'not that the prompt is malformed. Reasoning tokens count against the same ceiling; raise it.'
+    `in json_object mode this usually means the object was TRUNCATED at max_tokens (${params.max_tokens}), ` +
+    'not that the prompt is malformed. Reasoning tokens count against the same ceiling; raise it'
   );
 }
 
@@ -287,7 +309,10 @@ export async function complete(params: CompletionParams, options: CompleteOption
     const retryable = response.status === 429 || response.status >= 500;
     const body = await response.text().catch(() => '');
     lastReason = `HTTP ${response.status}: ${summarizeError(body)}`;
-    if (!retryable) throw new Error(`Groq request failed, not retryable — ${lastReason}${truncatedJsonHint(response.status, body, params)}`);
+    if (!retryable) {
+      const hint = truncatedJsonHint(response.status, body, params);
+      throw new Error(`Groq request failed, not retryable — ${hint ? `${hint} — ` : ''}${lastReason}`);
+    }
 
     const retryAfter = Number(response.headers.get('retry-after'));
     const delay = backoffDelay(attempt, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);

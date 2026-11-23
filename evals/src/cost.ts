@@ -76,13 +76,13 @@ function main(): void {
         model: DEFAULT_MODEL,
         ...MODEL_REASONING,
         temperature: 0,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
       });
       if (!cached(key)) {
         mainCold++;
-        mainColdTokens += estimateTokens(prompt) + 2000;
+        mainColdTokens += estimateTokens(prompt) + 4000;
       }
       responsePlaceholder = prompt;
     } else {
