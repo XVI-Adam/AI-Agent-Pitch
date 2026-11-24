@@ -511,8 +511,9 @@ so forks don't see a red X they cannot fix.
 not deterministic at temperature 0 on Groq: on one commit, with nothing
 changed, every nightly run from 2026-11-02 failed and each named a different
 set of "new regressions" and "expected failures now passing". So the nightly
-passes `--confirm=2`: each case that would block is re-sampled twice, and it
-blocks only if neither re-sample comes back the other way. The ones that do are
+passes `--confirm=1`: each case that would block is re-sampled once, and it
+blocks only if the re-sample agrees (two re-samples ran the under-test model
+into its 200,000 tokens-per-day cap on 2026-11-23). The ones that do are
 listed as flaky in the summary, not dropped silently. Counts, rates and
 `eval:baseline` still use the main pass alone. A case that fails every
 re-sample still blocks, including one whose baseline pass was the lucky draw;

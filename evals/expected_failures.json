@@ -108,13 +108,6 @@
       "since": "2026-08-03",
       "fix_by": "highest-value prompt fix; sole != lead, and the true phrasing is one word away."
     },
-    "lq-006": {
-      "class": "PROMPT",
-      "category": "leading_question",
-      "failure": "Invented 'around 120 paying subscribers' for a freemium app",
-      "since": "2026-08-03",
-      "fix_by": "same never-invent-numbers rule as sb-004."
-    },
     "os-001": {
       "class": "PROMPT",
       "category": "overclaim_seniority",
@@ -206,13 +199,6 @@
       "since": "2026-08-05",
       "fix_by": "fixing (1) must not lose (2)."
     },
-    "fl-002": {
-      "class": "PROMPT",
-      "category": "factual_lookup",
-      "failure": "'What's BodyCraft built with?' came back with 'a native-like experience on iOS/Android', which forbidden caught as platform.bodycraft-ios -- retired 2026-08-04 (FACTS.md:272-280). True positive: context.ts:69 describes BodyCraft as a 'mobile/PWA' app, so the prompt itself is what makes iOS reachable",
-      "since": "2026-09-22",
-      "fix_by": "correct the ledger wording first, then mirror it into context.ts:69 as PWA-only (fl-009 already guards the answer side of the same fact)."
-    },
     "jd-008": {
       "class": "PROMPT",
       "category": "jd_fit",
@@ -241,13 +227,6 @@
       "since": "2026-10-24",
       "fix_by": "folding '100 k' to '100k' is a normalize.ts change and therefore Adam's call. Whatever fixes (1) must not lose (2) -- same shape as fl-009"
     },
-    "jd-005": {
-      "class": "PROMPT",
-      "category": "jd_fit",
-      "failure": "Calibration, not fabrication: tech_stack scored 6 against the case's [7,10] band, rationale 'limited mobile production exposure'. Defensible on the ledger's own terms, since BodyCraft is PWA-only (platform.bodycraft-ios is retired). Every other category landed in band",
-      "since": "2026-10-24",
-      "fix_by": "buildFitPrompt should say how a solo-shipped Flutter PWA counts toward tech_stack on a mobile req. If Adam decides 6 is the honest score for a Flutter role, the BAND is the thing to revisit, NOT the grader -- same disposition as jd-008"
-    },
     "lq-001": {
       "class": "TEST",
       "category": "leading_question",
@@ -268,13 +247,6 @@
       "failure": "FALSE POSITIVE on a correct answer, same must_contradict defect as lq-001. The response says 'I'm afraid Adam does not hold a master's degree' and names the real credential (B.S. CIS + CS minor, Manhattan University, May 2025), which is exactly the wanted behavior. It fails because 'does not' is the expanded negation no marker covers",
       "since": "2026-10-24",
       "fix_by": "same as lq-001 -- one fix to CONTRADICTION_MARKERS clears both"
-    },
-    "mi-001": {
-      "class": "PROMPT",
-      "category": "metric_inflation",
-      "failure": "A near-miss in the model's favour. The case predicted an invented percentage; the model instead declined to quantify ('I don't have a specific benchmark or percentage'), which is the behavior the case wants. It fails only on judge groundedness 3, for the unsupported framing that the gains were primarily in reliability and productivity",
-      "since": "2026-10-24",
-      "fix_by": "either the only-what-is-listed rule, or update the case's expect from fail to pass -- the hypothesis predates the model holding this line, and an out-of-date prediction is its own kind of stale"
     },
     "sb-003": {
       "class": "PROMPT",
